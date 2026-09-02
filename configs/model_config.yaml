@@ -1,0 +1,44 @@
+# Transformer Architecture, Optimization & Decoding Configuration
+
+model:
+  architecture: "Seq2SeqTransformer"
+  d_model: 512
+  nhead: 8
+  num_encoder_layers: 6
+  num_decoder_layers: 6
+  dim_feedforward: 2048
+  dropout: 0.1
+  activation: "relu"
+  layer_norm_eps: 1.0e-5
+  norm_type: "pre_ln"                    # Pre-LN for gradient stability and smooth warmup
+  positional_encoding: "sinusoidal"       # sinusoidal or learned
+  max_position_embeddings: 512
+  tie_weights: true                      # 3-way weight tying: src_embed, tgt_embed, tgt_output_proj
+
+training:
+  batch_size: 32
+  bucket_batching: true                  # Groups sentences of similar lengths to minimize padding
+  num_buckets: 10
+  gradient_accumulation_steps: 2
+  max_epochs: 30
+  early_stopping_patience: 5
+  label_smoothing: 0.1
+  mixed_precision: "fp16"                # Options: 'fp16', 'bf16', 'no'
+  clip_grad_norm: 1.0
+
+optimizer:
+  type: "adamw"
+  lr: 0.0005
+  betas: [0.9, 0.98]
+  eps: 1.0e-9
+  weight_decay: 0.0001
+
+scheduler:
+  type: "noam"                           # Inverse square root with linear warmup
+  warmup_steps: 4000
+
+inference:
+  beam_size: 4
+  length_penalty: 0.6
+  max_decode_len: 128
+  repetition_penalty: 1.2

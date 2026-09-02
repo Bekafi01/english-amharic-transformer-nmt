@@ -1,0 +1,64 @@
+# Data Ingestion, Normalization, Sampling & Tokenization Configuration
+
+sources:
+  opus100:
+    type: "huggingface"
+    path: "Helsinki-NLP/opus-100"
+    subset: "am-en"
+    license: "CC-BY-4.0 / Various (OPUS Corpus)"
+    description: "Multi-domain parallel corpus collection from OPUS"
+    enabled: true
+  opus_books:
+    type: "huggingface"
+    path: "opus_books"
+    subset: "en-am"
+    license: "Public Domain / CC0"
+    description: "Literary and public domain parallel book translations"
+    enabled: true
+  ccaligned:
+    type: "url"
+    url: "https://data.statmt.org/cc-aligned/en_XX-am_ET.tsv.xz"
+    license: "Creative Commons / Web Crawled"
+    description: "Web-crawled parallel text from CCAligned"
+    enabled: false
+  tanzil:
+    type: "url"
+    url: "https://object.pouta.csc.fi/OPUS-Tanzil/v1/moses/am-en.txt.zip"
+    license: "Tanzil Project License"
+    description: "Religious and classical parallel text"
+    enabled: false
+
+sampling:
+  max_samples_per_source: 250000
+  total_max_samples: 500000
+
+splits:
+  train: 0.90
+  val: 0.05
+  test: 0.05
+
+preprocessing:
+  # Ethiopic script normalization
+  normalize_homophones: true  # Reduces vocabulary sparsity by mapping phonetic variants (ሀ/ሐ/ኀ/ሃ, ዐ/አ, ጸ/ፀ, ሠ/ሰ)
+  normalize_punctuation: true # Converts Ethiopic word separator (፡) to space, standardizes ። ፣ ፤ ፥ ፦
+  normalize_numerals: true    # Standardizes Ethiopic and Arabic numerals
+  remove_extra_whitespace: true
+  
+  # Length and ratio filtering
+  min_seq_len: 2
+  max_seq_len: 128
+  min_len_ratio: 0.5
+  max_len_ratio: 2.0
+  deduplicate: true
+
+tokenizer:
+  type: "bpe"
+  vocab_size: 32000
+  shared_vocab: true          # Shared BPE across Latin & Ethiopic scripts to support 3-way weight tying
+  min_frequency: 2
+  special_tokens:
+    pad: "<pad>"
+    unk: "<unk>"
+    bos: "<bos>"
+    eos: "<eos>"
+    mask: "<mask>"

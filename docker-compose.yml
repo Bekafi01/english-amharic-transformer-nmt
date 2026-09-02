@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  nmt-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nmt_api_server
+    command: uvicorn src.nmt_engine.serving.api:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./artifacts:/app/artifacts
+      - ./configs:/app/configs
+    environment:
+      - DEVICE=cpu
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+
+  nmt-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nmt_ui_app
+    command: streamlit run app.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./artifacts:/app/artifacts
+      - ./configs:/app/configs
+    environment:
+      - API_URL=http://nmt-api:8000
+    depends_on:
+      - nmt-api
+    restart: unless-stopped
