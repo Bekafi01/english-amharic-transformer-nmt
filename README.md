@@ -1,21 +1,23 @@
 # English-Amharic Transformer Neural Machine Translation (NMT)
 
-[![CI Pipeline](https://github.com/beka/english-amharic-transformer-nmt/actions/workflows/ci.yml/badge.svg)](https://github.com/beka/english-amharic-transformer-nmt/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![uv](https://img.shields.io/badge/package%20manager-uv-de5fe9.svg)](https://github.com/astral-sh/uv)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-An end-to-end, production-ready Neural Machine Translation (NMT) system specifically engineered for **English $\leftrightarrow$ Amharic** translation, featuring a custom **Sequence-to-Sequence Transformer** implemented from scratch in PyTorch, an Ethiopic script normalization engine, Byte-Pair Encoding (BPE) tokenization, mixed-precision training, beam search decoding, ONNX Runtime acceleration, and full FastAPI / Streamlit serving.
+An end-to-end, production-grade Neural Machine Translation (NMT) system specifically engineered for bidirectional **English $\leftrightarrow$ Amharic** translation. The repository encompasses large-scale multi-source parallel corpus acquisition (**17.5+ Million sentence pairs**), an Ethiopic script normalization engine, shared Byte-Pair Encoding (BPE) subword tokenization, a custom **Sequence-to-Sequence Transformer** built from scratch in PyTorch, mixed-precision training, beam search decoding, ONNX Runtime hardware acceleration, and containerized FastAPI / Streamlit serving.
 
 ---
 
 ## Key Highlights
 
-- **From-Scratch Transformer Architecture**: Pre-LayerNorm (Pre-LN) multi-head self-attention and cross-attention blocks built modularly with Sinusoidal Positional Encoding and 3-way weight tying.
-- **Ethiopic Script Normalization**: Specialized preprocessor handling Amharic homophones (ሀ/ሐ/ኀ/ሃ, ዐ/አ, ጸ/ፀ, ሠ/ሰ), Ethiopic punctuation (`፡` `።` `፤` `፥`), and numeral standardizations.
-- **Shared BPE Vocabulary (32k)**: A unified subword tokenizer covering Latin and Ethiopic Unicode scripts to enable joint representation and weight tying.
-- **Optimized Training Loop**: Mixed-precision training (`torch.cuda.amp`), Noam learning rate schedule with warmup, dynamic length-bucketed batch sampling, and label-smoothed cross-entropy loss.
-- **High-Performance Inference**: Configurable Beam Search decoding with length penalty and repetition penalty, plus automated export to ONNX Runtime.
+- **17.5M+ Parallel Corpus Acquisition**: High-speed, streaming data acquisition pipeline mining Meta NLLB LASER-3 bitext, OPUS archives (CCAligned, Tanzil, OPUS-100), curated MT560 slices, and verified human discourse corpora.
+- **Constant-Memory Chunked Serialization**: Memory-bounded streaming PyArrow Parquet writer ($500\text{k}$ chunk size) maintaining a flat $\le 250\text{ MB}$ RAM footprint throughout multi-gigabyte exports.
+- **Zero-Contamination Benchmark Isolation**: Strict quarantine of the 6,027 gold-standard FLORES-200 professional human translations exclusively for evaluation and ablation.
+- **Ethiopic Script Normalization**: Specialized preprocessor addressing Amharic orthographic homophones (ሀ/ሐ/ኀ/ሃ, ዐ/አ, ጸ/ፀ, ሠ/ሰ), Ethiopic punctuation (`፡` `።` `፤` `፥`), and numeral conversions.
+- **Shared BPE Vocabulary (32k)**: Unified subword tokenizer across Latin and Ethiopic Unicode scripts to enable joint cross-lingual representation and 3-way embedding weight tying.
+- **From-Scratch Transformer Architecture**: Pre-LayerNorm (Pre-LN) multi-head self-attention and cross-attention blocks with Sinusoidal Positional Embeddings and residual connections.
+- **Optimized Training & Inference**: Mixed-precision (`torch.cuda.amp`), Noam learning rate schedule with linear warmup, dynamic length-bucketed batch sampling, label-smoothed cross-entropy, beam search decoding, and ONNX Runtime deployment.
 - **Production Serving**: Containerized FastAPI REST API (`/translate`, `/health`) and interactive Streamlit web dashboard.
 
 ---
@@ -32,7 +34,7 @@ english-amharic-transformer-nmt/
 │   ├── data_config.yaml               # Data sources, URLs, licensing, Ethiopic normalizers
 │   └── model_config.yaml              # Transformer dimensions, optimizer, scheduler params
 ├── data/
-│   ├── raw/                           # Downloaded raw corpus archives
+│   ├── raw/                           # Downloaded raw corpus archives & Parquet tables
 │   └── processed/                     # Cleaned, tokenized train/val/test splits
 ├── artifacts/
 │   ├── tokenizers/                    # Trained vocabularies and tokenizer configs
@@ -99,67 +101,108 @@ english-amharic-transformer-nmt/
 
 ---
 
+## Parallel Corpus Engineering & Empirical Benchmarks
+
+The data acquisition engine consolidates parallel corpora across multiple domains, combining semantically mined bitext with high-register human translations:
+
+| Source ID | Origin / Repository | Pairs Collected | % Share | Mining & Alignment Methodology |
+|:---|:---|:---:|:---:|:---|
+| **`nllb`** | Meta AI NLLB Bitext (`amh_Ethi-eng_Latn`) | **16,137,053** | 91.86% | **LASER-3 Semantic Vector Mining**: High-margin cross-lingual cosine similarity streamed directly from GCS storage. |
+| **`mt560`** | `michsethowusu/english-amharic_sentence-pairs_mt560` | **669,145** | 3.81% | Multi-domain OPUS benchmark slice providing broad lexical coverage. |
+| **`opus_ccaligned`** | OPUS CCAligned (`am-en`) | **346,511** | 1.97% | Common Crawl web-mined parallel sentences for technical & modern terms. |
+| **`drive_custom`** | Curated Human Translation Corpus | **228,000** | 1.30% | Verified news, discourse, and conversational parallel sentences. |
+| **`opus_tanzil`** | OPUS Tanzil (`am-en`) | **93,526** | 0.53% | Classical and literary parallel texts with strict sentence-level alignment. |
+| **`opus100`** | `Helsinki-NLP/opus-100` (`am-en`) | **93,027** | 0.53% | Curated multi-domain parallel corpus across news, subtitles, and documentation. |
+| **Total Training Pool** | **Aggregated Parallel Corpus** | **17,567,262** | **100.0%** | **Compressed Parquet Size: 1.78 GB (Snappy)** |
+| **`flores200`** | `rasyosef/flores_english_amharic_mt` | **6,027** | *Isolated* | **FLORES-200 Gold Standard**: Professionally translated benchmark quarantined for evaluation. |
+
+### Data Quality & Script Verification Metrics
+- **Parallel Completeness**: **100.00%** ($17,567,262$ / $17,567,262$ non-empty, non-null pairs).
+- **Distinct Target Pairs**: **99.99%** unique translation pairs.
+- **Script Compliance ($n=200,000$)**:
+  - Amharic text contains Ge'ez Fidel (`\u1200`–`\u137F`): **99.95%**
+  - English text contains Latin characters (`[a-zA-Z]`): **99.98%**
+- **Token Profile**:
+  - English sentence length: Mean = 12.1 words, Median = 10.0 words, $p_{95} = 27$ words.
+  - Amharic sentence length: Mean = 8.6 words, Median = 7.0 words, $p_{95} = 19$ words.
+- **Streaming Throughput**: **310,925 pairs/sec** during chunked serialization into Snappy Parquet.
+
+---
+
 ## Architectural & Design Decisions
 
-### 1. Ethiopic Script Normalization & Low-Resource Sparing
-Amharic is written in the Ethiopic syllabary (Fidel) and features several character pairs that produce identical phonetic values in modern spoken Amharic (e.g. `ሀ`, `ሐ`, `ኀ`, `ሃ` all map to /h/; `ሰ`, `ሠ` to /s/; `አ`, `ዐ` to /ʔ/; `ጸ`, `ፀ` to /tsʼ/).
-- **Normalization ON by default**: Mapping these homophones reduces vocabulary sparsity significantly during training on low-resource parallel corpora.
-- **Ablation Tracking**: The data pipeline preserves the raw corpus in `data/raw/` so datasets can be reproduced with normalization disabled. Quality comparisons (BLEU and chrF++) are recorded in `artifacts/benchmarks/`.
+### 1. Ethiopic Script Normalization
+Amharic uses the Ge'ez syllabary (Fidel) and features several character sets that share identical phonetic pronunciations in modern spoken Amharic (homophones):
+- `ሀ`, `ሐ`, `ኀ`, `ሃ` $\rightarrow$ unified to `ሀ` (/h/)
+- `አ`, `ዐ` $\rightarrow$ unified to `አ` (/ʔ/)
+- `ጸ`, `ፀ` $\rightarrow$ unified to `ጸ` (/tsʼ/)
+- `ሰ`, `ሠ` $\rightarrow$ unified to `ሰ` (/s/)
 
-### 2. Shared BPE Vocabulary (32k) & Weight Tying
-A unified 32,000 Byte-Pair Encoding subword vocabulary is used for both English and Amharic.
-- Because Latin and Ethiopic scripts are disjoint in Unicode, the vocabulary naturally partitions merges between the two scripts.
-- Shared embeddings allow **3-way weight tying** ($E_{\text{src}} = E_{\text{tgt}} = W_{\text{out}}^T$), reducing parameter count and regularizing numbers, punctuation, and shared international tokens.
+Normalizing these characters collapses vocabulary fragmentation and reduces out-of-vocabulary (OOV) rates without altering semantic fidelity. Ethiopic word separators (`፡`) are standardized to spaces, and terminal punctuation (`።` `፤` `፥` `፦`) is preserved.
 
-### 3. Benchmarks Disambiguation
-- **Runtime Performance Profiler (`src/nmt_engine/evaluation/benchmarks.py`)**: Profiles hardware latency (p50/p95/p99 ms), generation throughput (tokens/sec), and memory footprint comparing PyTorch vs ONNX Runtime.
-- **Quality Evaluation Reports (`artifacts/benchmarks/`)**: Stores translation metric logs (SacreBLEU, chrF++, TER) across test sets and ablation configurations.
+### 2. Shared 32k BPE Vocabulary & Weight Tying
+A unified 32,000 subword vocabulary is trained jointly across English and Amharic text:
+- Because the Latin and Ethiopic Unicode blocks are completely disjoint, subword merges naturally partition across language boundaries.
+- A shared vocabulary enables **three-way weight tying**:
+  $$E_{\text{src}} = E_{\text{tgt}} = W_{\text{projection}}^T$$
+  This drastically decreases parameter count, regularizes shared numerals and punctuation, and improves gradient flow.
+
+### 3. Pre-LN Transformer Architecture
+Following modern Transformer best practices, Layer Normalization is placed on the input paths of each sub-layer (**Pre-LN**) rather than on the residual addition path (**Post-LN**). This stabilizes gradients at initialization and enables training without delicate learning-rate warmup warm-starts.
 
 ---
 
 ## Quick Start
 
-### 1. Installation
+### 1. Environment Setup
+
+This project uses [uv](https://github.com/astral-sh/uv) for fast, deterministic Python environment and dependency management.
+
 ```bash
-# Clone repository
-git clone https://github.com/beka/english-amharic-transformer-nmt.git
+# Clone the repository
+git clone https://github.com/Bekafi01/english-amharic-transformer-nmt.git
 cd english-amharic-transformer-nmt
 
-# Install in editable mode with development dependencies
+# Synchronize dependencies with uv
+uv sync --extra dev
+```
+
+Alternatively, standard `pip` can be used:
+```bash
 pip install -e ".[dev]"
 ```
 
-### 2. Pipeline Execution via CLI
+### 2. Parallel Corpus Acquisition via CLI
+
+To run the multi-source parallel data acquisition pipeline:
+
 ```bash
-# 1. Download parallel corpus
-python scripts/main.py collect
+# Ingest all configured sources and serialize to Parquet
+uv run python scripts/main.py collect --config configs/data_config.yaml --output-dir data/raw
 
-# 2. Preprocess & normalize Ethiopic / English text
-python scripts/main.py preprocess
-
-# 3. Train shared BPE tokenizer
-python scripts/main.py train-tokenizer
-
-# 4. Train Transformer model from scratch
-python scripts/main.py train
-
-# 5. Evaluate on test set (SacreBLEU / chrF++)
-python scripts/main.py evaluate
-
-# 6. Export to optimized ONNX format
-python scripts/main.py export
+# Run rapid test collection capped at 10,000 pairs per source
+uv run python scripts/main.py collect --max-samples 10000 --output-dir data/raw_sample
 ```
 
-### 3. Interactive Web App & API Serving
-```bash
-# Start FastAPI backend
-uvicorn src.nmt_engine.serving.api:app --host 0.0.0.0 --port 8000 --reload
+CLI options:
+- `--config`, `-c`: Path to data configuration YAML (default: `configs/data_config.yaml`).
+- `--output-dir`, `-o`: Output folder for raw Parquet and manifest (default: `data/raw`).
+- `--max-samples`, `-n`: Cap on samples per source for quick iteration.
+- `--chunk-size`: Number of rows per PyArrow chunk for constant RAM usage (default: `500,000`).
+- `--skip`: Comma-separated source IDs to skip (e.g. `--skip ccaligned,opus_tanzil`).
 
-# Start Streamlit translation UI
-streamlit run app.py
+### 3. Interactive Web Application & Serving
+
+```bash
+# Launch FastAPI inference server
+uv run uvicorn src.nmt_engine.serving.api:app --host 0.0.0.0 --port 8000 --reload
+
+# Launch interactive Streamlit UI
+uv run streamlit run app.py
 ```
 
-### 4. Running with Docker Compose
+### 4. Containerized Deployment
+
 ```bash
 docker compose up --build
 ```
@@ -167,27 +210,23 @@ docker compose up --build
 ---
 
 ## Testing & Quality Assurance
-```bash
-# Run complete test suite
-pytest tests/ -v
 
-# Run linting and code formatting checks
-ruff check src/ tests/ configs/
-black --check src/ tests/
+The test suite validates data ingestion, Unicode normalization, script-based extraction, and model dimensions:
+
+```bash
+# Run complete test suite with coverage
+uv run pytest tests/ -v
+
+# Run collector-specific unit tests
+uv run pytest tests/test_collector.py -v
+
+# Run linting and code style checks
+uv run ruff check src/ tests/ configs/
+uv run ruff format --check src/ tests/
 ```
 
 ---
 
-## Data Sources & Licensing
-
-| Dataset | Source | License | Description |
-| :--- | :--- | :--- | :--- |
-| **OPUS-100** | [Helsinki-NLP/opus-100](https://huggingface.co/datasets/Helsinki-NLP/opus-100) | CC-BY-4.0 / Various | Multi-domain collection from OPUS |
-| **OPUS Books** | [opus_books](https://huggingface.co/datasets/opus_books) | Public Domain / CC0 | Parallel literary texts |
-| **CCAligned** | [Statmt](https://data.statmt.org/cc-aligned/) | CC-BY-SA | Web-crawled aligned sentences |
-| **Tanzil** | [OPUS Tanzil](https://object.pouta.csc.fi/OPUS-Tanzil/) | Tanzil License | Parallel religious/classical texts |
-
----
-
 ## License
+
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
