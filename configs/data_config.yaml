@@ -1,36 +1,56 @@
 # Data Ingestion, Normalization, Sampling & Tokenization Configuration
 
 sources:
+  mt560:
+    type: "huggingface"
+    path: "michsethowusu/english-amharic_sentence-pairs_mt560"
+    subset: null
+    license: "Open / MT560"
+    description: "Curated large-scale English-Amharic parallel corpus (669k pairs)"
+    enabled: true
   opus100:
     type: "huggingface"
     path: "Helsinki-NLP/opus-100"
     subset: "am-en"
     license: "CC-BY-4.0 / Various (OPUS Corpus)"
-    description: "Multi-domain parallel corpus collection from OPUS"
+    description: "Multi-domain parallel corpus collection from OPUS (93k pairs)"
     enabled: true
-  opus_books:
-    type: "huggingface"
-    path: "opus_books"
-    subset: "en-am"
-    license: "Public Domain / CC0"
-    description: "Literary and public domain parallel book translations"
-    enabled: true
-  ccaligned:
-    type: "url"
-    url: "https://data.statmt.org/cc-aligned/en_XX-am_ET.tsv.xz"
-    license: "Creative Commons / Web Crawled"
-    description: "Web-crawled parallel text from CCAligned"
-    enabled: false
   tanzil:
     type: "url"
     url: "https://object.pouta.csc.fi/OPUS-Tanzil/v1/moses/am-en.txt.zip"
     license: "Tanzil Project License"
-    description: "Religious and classical parallel text"
-    enabled: false
+    description: "Religious and classical parallel text (~100k pairs)"
+    enabled: true
+  flores:
+    type: "huggingface"
+    path: "rasyosef/flores_english_amharic_mt"
+    subset: null
+    license: "CC-BY-SA-4.0"
+    description: "Gold-standard human-translated evaluation benchmark"
+    enabled: true
+  nllb:
+    type: "gcs_stream"
+    url: "https://storage.googleapis.com/allennlp-data-bucket/nllb/amh_Ethi-eng_Latn.gz"
+    license: "CC-BY-NC-4.0 / Meta AI"
+    description: "Meta NLLB LASER-3 semantically mined parallel bitext (16.1M pairs pool)"
+    enabled: true
+  ccaligned:
+    type: "url"
+    url: "https://object.pouta.csc.fi/OPUS-CCAligned/v1/moses/am-en.txt.zip"
+    license: "Creative Commons / Web Crawled"
+    description: "Web-crawled parallel text from OPUS CCAligned (~346k pairs)"
+    enabled: true
+  drive_custom:
+    type: "local_parallel_text"
+    am_path: "/content/drive/MyDrive/Internship/MT/Data/am_data.txt"
+    en_path: "/content/drive/MyDrive/Internship/MT/Data/eng_data.txt"
+    license: "Human Verified / Curated"
+    description: "Human-verified bilingual news, discourse, and conversational corpus (228k pairs)"
+    enabled: true
 
 sampling:
-  max_samples_per_source: 250000
-  total_max_samples: 500000
+  target_raw_collection: 2000000
+  stream_batch_size: 100000
 
 splits:
   train: 0.90

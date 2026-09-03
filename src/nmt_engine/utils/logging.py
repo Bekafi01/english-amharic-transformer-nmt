@@ -30,14 +30,20 @@ def setup_logging(
 
     handlers: list[logging.Handler] = []
 
+    if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+
     if rich_formatting:
-        console = Console(file=sys.stdout)
+        console = Console(file=sys.stdout, legacy_windows=False)
         rich_handler = RichHandler(
             console=console,
             show_time=True,
             show_path=False,
             rich_tracebacks=True,
-            markup=True,
+            markup=False,
         )
         rich_handler.setLevel(numeric_level)
         handlers.append(rich_handler)

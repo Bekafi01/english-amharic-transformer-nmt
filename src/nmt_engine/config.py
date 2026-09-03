@@ -73,12 +73,15 @@ class BaseConfig(BaseModel):
 class SourceItemConfig(BaseModel):
     """Configuration for an individual parallel data source."""
 
-    type: Literal["huggingface", "url", "local"] = Field(
+    type: Literal["huggingface", "url", "local", "gcs_stream", "local_parallel_text"] = Field(
         default="huggingface", description="Source ingestion protocol"
     )
     path: str | None = Field(default=None, description="HuggingFace dataset path or local file")
     subset: str | None = Field(default=None, description="HuggingFace dataset subset/name")
-    url: str | None = Field(default=None, description="Direct download URL if type is 'url'")
+    url: str | None = Field(default=None, description="Direct download URL if type is 'url' or 'gcs_stream'")
+    am_path: str | None = Field(default=None, description="Amharic text file path for local parallel text")
+    en_path: str | None = Field(default=None, description="English text file path for local parallel text")
+    max_samples: int | None = Field(default=None, description="Optional cap on samples for this source")
     license: str | None = Field(default=None, description="Corpus licensing information")
     description: str | None = Field(default=None, description="Corpus notes and domain summary")
     enabled: bool = Field(default=True, description="Whether to ingest this source")
@@ -370,3 +373,18 @@ def load_config(
 
     app_cfg = AppConfig(base=base_cfg, data=data_cfg, model=model_cfg)
     return app_cfg
+
+
+def load_data_config(config_path: str | Path = "configs/data_config.yaml") -> DataConfig:
+    """Loads and validates data configuration YAML into DataConfig.
+
+    Args:
+        config_path: Path to data configuration YAML file.
+
+    Returns:
+        Validated DataConfig instance.
+    """
+    p = Path(config_path)
+    data_dict = load_yaml(p) if p.exists() else {}
+    return DataConfig(**data_dict)
+
