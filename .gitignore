@@ -51,9 +51,10 @@ venv.bak/
 htmlcov/
 .tox/
 
-# Jupyter Notebook checkpoints
+# Jupyter Notebook checkpoints & exploratory notebooks
 .ipynb_checkpoints/
 */.ipynb_checkpoints/*
+notebooks/am_en_translation.ipynb
 
 # Data directories (keep directory structure with .gitkeep, ignore big data files)
 data/raw/*
