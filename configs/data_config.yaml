@@ -81,4 +81,4 @@ tokenizer:
     unk: "<unk>"
     bos: "<bos>"
     eos: "<eos>"
-    mask: "<mask>"
+    mask: "<mask_src>"
