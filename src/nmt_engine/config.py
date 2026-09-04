@@ -161,6 +161,8 @@ class SpecialTokensConfig(BaseModel):
     bos: str = Field(default="<bos>", description="Beginning of sequence token")
     eos: str = Field(default="<eos>", description="End of sequence token")
     mask: str = Field(default="<mask_src>", description="Mask token")
+    to_en: str = Field(default="<2en>", description="Direction token for English target")
+    to_am: str = Field(default="<2am>", description="Direction token for Amharic target")
 
 
 class TokenizerConfig(BaseModel):

@@ -82,3 +82,5 @@ tokenizer:
     bos: "<bos>"
     eos: "<eos>"
     mask: "<mask_src>"
+    to_en: "<2en>"
+    to_am: "<2am>"
