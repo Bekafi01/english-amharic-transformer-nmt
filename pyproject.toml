@@ -1,84 +1,107 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
-name = "nmt-engine"
-version = "0.1.0"
-description = "Production-ready English-Amharic Neural Machine Translation with custom PyTorch Transformer"
+name = "amnmt"
+version = "2.0.0a0"
+description = "English <-> Amharic neural machine translation with a from-scratch PyTorch Transformer"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = { text = "MIT" }
-authors = [
-    { name = "Beka", email = "beka@example.com" }
-]
-keywords = ["nmt", "transformer", "amharic", "nlp", "machine-translation", "pytorch", "onnx"]
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
-    "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-]
+authors = [{ name = "Beka" }]
+keywords = ["nmt", "transformer", "amharic", "machine-translation", "pytorch"]
 
+# Core: what L0 (core) and the CLI need. Heavy layer-specific deps live in extras.
 dependencies = [
-    "torch>=2.0.0",
-    "tokenizers>=0.15.0",
-    "sacrebleu>=2.3.0",
-    "datasets>=2.14.0",
-    "pydantic>=2.0.0",
-    "pyyaml>=6.0.0",
-    "fastapi>=0.100.0",
-    "uvicorn[standard]>=0.23.0",
-    "streamlit>=1.25.0",
-    "rich>=13.0.0",
-    "tqdm>=4.65.0",
-    "numpy>=1.24.0",
-    "onnx>=1.14.0",
-    "onnxruntime>=1.15.0",
-    "requests>=2.31.0",
-    "datasketch>=2.0.0",
-    "langid>=1.1.6",
+    "pydantic>=2.7",
+    "pyyaml>=6.0",
+    "typer>=0.12",
+    "rich>=13.7",
+    "torch>=2.3",
 ]
 
 [project.optional-dependencies]
+data = ["datasets>=2.19", "pyarrow>=15.0", "datasketch>=1.6", "fasttext-wheel>=0.9.2"]
+tokenization = ["tokenizers>=0.19"]
+evaluation = ["sacrebleu>=2.4"]
+serving = ["fastapi>=0.111", "uvicorn[standard]>=0.29", "streamlit>=1.35"]
+all = ["amnmt[data,tokenization,evaluation,serving]"]
+
+[dependency-groups]
 dev = [
-    "pytest>=7.4.0",
-    "pytest-cov>=4.1.0",
-    "pytest-mock>=3.11.0",
-    "ruff>=0.1.0",
-    "black>=23.7.0",
-    "isort>=5.12.0",
-    "mypy>=1.5.0",
-    "ipykernel>=6.25.0",
-    "matplotlib>=3.7.0",
-    "seaborn>=0.12.0",
-    "pandas>=2.0.0",
+    "pytest>=8.2",
+    "pytest-cov>=5.0",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "import-linter>=2.0",
+    "types-PyYAML",
 ]
 
 [project.scripts]
-nmt = "scripts.main:cli"
+amnmt = "amnmt.cli:app"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/amnmt"]
+
+# --------------------------------------------------------------------------------------
+# Quality tooling
+# --------------------------------------------------------------------------------------
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_*.py"]
-pythonpath = ["."]
-addopts = "-v --strict-markers"
-
-[tool.black]
-line-length = 100
-target-version = ["py310", "py311"]
+addopts = "-q --strict-markers"
+markers = ["slow: takes more than a few seconds; skipped in the default CI run"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py312"
+src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "C4", "UP"]
-ignore = ["E501"]
+select = ["E", "F", "I", "B", "UP", "N", "SIM", "RUF"]
+ignore = ["RUF012"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["amnmt"]
+
+[tool.mypy]
+python_version = "3.12"
+packages = ["amnmt"]
+mypy_path = "src"
+strict = true
+ignore_missing_imports = true
+
+# --------------------------------------------------------------------------------------
+# Architecture contracts (enforced by `lint-imports`). See PLAN.md "Package layout".
+# --------------------------------------------------------------------------------------
+
+[tool.importlinter]
+root_package = "amnmt"
+
+[[tool.importlinter.contracts]]
+name = "Layers: lower layers never import higher ones"
+type = "layers"
+layers = [
+    "amnmt.cli",
+    "amnmt.serving",
+    "amnmt.evaluation",
+    "amnmt.inference",
+    "amnmt.training",
+    "amnmt.model",
+    "amnmt.tokenization",
+    "amnmt.data",
+    "amnmt.core",
+]
+
+[[tool.importlinter.contracts]]
+name = "core has no ML dependencies"
+type = "forbidden"
+source_modules = ["amnmt.core"]
+forbidden_modules = ["torch", "datasets", "tokenizers", "sacrebleu", "fastapi", "streamlit"]
+
+[[tool.importlinter.contracts]]
+name = "model is pure torch: no I/O, no config files, no data layer"
+type = "forbidden"
+source_modules = ["amnmt.model"]
+forbidden_modules = ["yaml", "pyarrow", "datasets", "tokenizers", "amnmt.data", "amnmt.tokenization"]

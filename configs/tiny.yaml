@@ -1,0 +1,11 @@
+# Smallest end-to-end config. Runs every stage on CPU in minutes. Must always work.
+project:
+  name: tiny
+  seed: 42
+  device: auto
+
+paths:
+  root: .
+  data_raw: data/raw
+  data_processed: data/processed
+  artifacts: artifacts/tiny
