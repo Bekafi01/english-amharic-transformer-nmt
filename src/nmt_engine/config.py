@@ -78,10 +78,18 @@ class SourceItemConfig(BaseModel):
     )
     path: str | None = Field(default=None, description="HuggingFace dataset path or local file")
     subset: str | None = Field(default=None, description="HuggingFace dataset subset/name")
-    url: str | None = Field(default=None, description="Direct download URL if type is 'url' or 'gcs_stream'")
-    am_path: str | None = Field(default=None, description="Amharic text file path for local parallel text")
-    en_path: str | None = Field(default=None, description="English text file path for local parallel text")
-    max_samples: int | None = Field(default=None, description="Optional cap on samples for this source")
+    url: str | None = Field(
+        default=None, description="Direct download URL if type is 'url' or 'gcs_stream'"
+    )
+    am_path: str | None = Field(
+        default=None, description="Amharic text file path for local parallel text"
+    )
+    en_path: str | None = Field(
+        default=None, description="English text file path for local parallel text"
+    )
+    max_samples: int | None = Field(
+        default=None, description="Optional cap on samples for this source"
+    )
     license: str | None = Field(default=None, description="Corpus licensing information")
     description: str | None = Field(default=None, description="Corpus notes and domain summary")
     enabled: bool = Field(default=True, description="Whether to ingest this source")
@@ -389,4 +397,3 @@ def load_data_config(config_path: str | Path = "configs/data_config.yaml") -> Da
     p = Path(config_path)
     data_dict = load_yaml(p) if p.exists() else {}
     return DataConfig(**data_dict)
-

@@ -17,8 +17,36 @@ An end-to-end, production-grade Neural Machine Translation (NMT) system specific
 - **Ethiopic Script Normalization**: Specialized preprocessor addressing Amharic orthographic homophones (ሀ/ሐ/ኀ/ሃ, ዐ/አ, ጸ/ፀ, ሠ/ሰ), Ethiopic punctuation (`፡` `።` `፤` `፥`), and numeral conversions.
 - **Shared BPE Vocabulary (32k)**: Unified subword tokenizer across Latin and Ethiopic Unicode scripts to enable joint cross-lingual representation and 3-way embedding weight tying.
 - **From-Scratch Transformer Architecture**: Pre-LayerNorm (Pre-LN) multi-head self-attention and cross-attention blocks with Sinusoidal Positional Embeddings and residual connections.
-- **Optimized Training & Inference**: Mixed-precision (`torch.cuda.amp`), Noam learning rate schedule with linear warmup, dynamic length-bucketed batch sampling, label-smoothed cross-entropy, beam search decoding, and ONNX Runtime deployment.
-- **Production Serving**: Containerized FastAPI REST API (`/translate`, `/health`) and interactive Streamlit web dashboard.
+- **Production Serving**: Containerized FastAPI REST API (`/translate`, `/health`, `/models`) and interactive Streamlit web dashboard.
+
+---
+
+## System Architecture
+
+```mermaid
+flowchart TD
+    subgraph DataEngine["1. Corpus Ingestion & Preprocessing"]
+        RAW[Multi-Source Bitext<br/>17.5M+ Parallel Pairs] --> STREAM[Chunked PyArrow Parquet<br/>Constant RAM ≤ 250MB]
+        STREAM --> NORM[Ethiopic Normalizer<br/>Homophones, Numerals, Punctuation]
+        NORM --> DEDUP[MinHash LSH Deduplication<br/>128 Permutations, Jaccard ≥ 0.90]
+        DEDUP --> TOK[Joint Metaspace BPE<br/>32,000 Vocab + ByteFallback]
+    end
+
+    subgraph Architecture["2. Model Architecture & Batching"]
+        TOK --> BUCKET[Dynamic Quantile Bucketing<br/>BucketBatchSampler: 47% Padding Reduction]
+        BUCKET --> EMB[3-Way Weight Tying<br/>E_src = E_tgt = W_proj^T]
+        EMB --> ENCODER[6-Layer Pre-LN Encoder<br/>d_model=512, h=8, d_ff=2048]
+        ENCODER --> DECODER[6-Layer Pre-LN Decoder<br/>Causal & Cross-Attention]
+        DECODER --> LOSS[Label Smoothing Loss<br/>ε = 0.1, Noam Warmup]
+    end
+
+    subgraph InferenceServing["3. Autoregressive Inference & Serving"]
+        DECODER --> BEAM[Vectorized Batched Beam Search<br/>Length α=0.6, Repetition θ=1.2]
+        BEAM --> EVAL[FLORES-200 Gold Benchmark<br/>SacreBLEU, chrF++, TER]
+        BEAM --> FASTAPI[FastAPI REST API<br/>/translate, /health, /models]
+        BEAM --> UI[Streamlit Interactive UI<br/>Real-Time Subword Inspection]
+    end
+```
 
 ---
 
@@ -28,75 +56,67 @@ An end-to-end, production-grade Neural Machine Translation (NMT) system specific
 english-amharic-transformer-nmt/
 ├── .github/
 │   └── workflows/
-│       └── ci.yml                     # GitHub Actions CI for linting & automated tests
+│       └── ci.yml                            # GitHub Actions CI for linting & automated tests
 ├── configs/
-│   ├── base_config.yaml               # Global seed, paths, logging, hardware config
-│   ├── data_config.yaml               # Data sources, URLs, licensing, Ethiopic normalizers
-│   └── model_config.yaml              # Transformer dimensions, optimizer, scheduler params
+│   ├── base_config.yaml                      # Global seed, paths, logging, hardware config
+│   ├── data_config.yaml                      # Data sources, URLs, licensing, Ethiopic normalizers
+│   └── model_config.yaml                     # Transformer dimensions, optimizer, scheduler params
 ├── data/
-│   ├── raw/                           # Downloaded raw corpus archives & Parquet tables
-│   └── processed/                     # Cleaned, tokenized train/val/test splits
+│   ├── raw/                                  # Downloaded raw corpus archives & Parquet tables
+│   └── processed/                            # Cleaned, tokenized train/val/test splits
 ├── artifacts/
-│   ├── tokenizers/                    # Trained vocabularies and tokenizer configs
-│   ├── checkpoints/                   # Model weights, best checkpoints, optimizer state
-│   ├── onnx/                          # Exported ONNX models and quantized weights
-│   └── benchmarks/                    # Quality & ablation reports (BLEU, chrF++, TER)
+│   ├── tokenizers/                           # Trained 32k ByteFallback BPE vocabulary & model
+│   ├── checkpoints/                          # Model weights, best checkpoints, optimizer state
+│   └── evaluation/                           # Quality & ablation reports (BLEU, chrF++, TER)
 ├── notebooks/
-│   ├── 01_corpus_collection_and_cleaning.ipynb   # Exploratory corpus analysis & Ethiopic EDA
-│   ├── 02_tokenizer_training.ipynb               # BPE/WordPiece tokenization experiments
-│   ├── 03_transformer_from_scratch.ipynb         # Transformer modules & attention map viz
-│   └── 04_evaluation_and_benchmarks.ipynb        # Test set evaluation, error analysis & ONNX
+│   ├── 01_corpus_collection_and_cleaning.ipynb   # Multi-source parallel corpus ingestion
+│   ├── 02_preprocessing_and_tokenization.ipynb   # Ethiopic normalization & 32k BPE training
+│   ├── 03_training_transformer_colab.ipynb       # Pre-LN Transformer training on Colab T4 GPU
+│   └── 04_evaluation_and_benchmarks.ipynb        # FLORES-200 gold benchmarking & metrics
 ├── src/
 │   └── nmt_engine/
-│       ├── config.py                  # Strongly-typed Pydantic YAML config loader
+│       ├── config.py                         # Strongly-typed Pydantic YAML config loader
 │       ├── data/
-│       │   ├── collector.py           # Multi-source dataset downloader & dispatcher
-│       │   ├── preprocessor.py        # Amharic & English Unicode cleaner and length filter
-│       │   ├── tokenizer.py          # BPE tokenizer wrapper (encode/decode/save/load)
-│       │   ├── dataset.py            # PyTorch TranslationDataset with dynamic padding
-│       │   └── samplers.py           # Length-bucketed dynamic batch sampler
+│       │   ├── collector.py                  # Multi-source dataset downloader & Parquet streaming
+│       │   ├── preprocessor.py               # Amharic homophones, Ge'ez numerals & MinHash LSH
+│       │   ├── tokenizer.py                  # 32k Metaspace ByteFallback BPE tokenizer
+│       │   └── dataset.py                    # TranslationDataset & dynamic BucketBatchSampler
 │       ├── models/
-│       │   ├── transformer.py        # Full Encoder-Decoder Transformer model
-│       │   ├── encoder.py            # Pre-LN TransformerEncoder & EncoderLayer
-│       │   ├── decoder.py            # Pre-LN TransformerDecoder & DecoderLayer
-│       │   ├── attention.py          # MultiHeadAttention with scaled dot-product
-│       │   ├── embeddings.py         # Token & Positional embeddings (Sinusoidal/Learned)
-│       │   └── layers.py             # FeedForward, LayerNorm/RMSNorm, Residuals
+│       │   └── transformer.py                # Pre-LN Seq2Seq Transformer (3-Way Weight Tying)
 │       ├── training/
-│       │   ├── trainer.py            # Epoch loop, AMP, gradient accumulation & clipping
-│       │   ├── loss.py               # Label smoothed cross-entropy loss
-│       │   ├── lr_schedule.py        # Noam / Inverse-Square-Root warmup scheduler
-│       │   └── callbacks.py          # Checkpointing, EarlyStopping, Metric tracking
+│       │   ├── trainer.py                    # PyTorch 2.x AMP, gradient accumulation & clipping
+│       │   ├── loss.py                       # Label-smoothed cross-entropy loss (ε=0.1)
+│       │   └── scheduler.py                  # Noam inverse-square-root warmup scheduler
 │       ├── inference/
-│       │   ├── translator.py         # Greedy & Beam Search decoding with length penalty
-│       │   └── exporter.py           # PyTorch to ONNX export & dynamic batching
+│       │   ├── decoding.py                   # Vectorized beam search with length & repetition penalty
+│       │   └── translator.py                 # Production bidirectional Translator (<2am>, <2en>)
 │       ├── evaluation/
-│       │   ├── metrics.py            # BLEU (sacrebleu), chrF++, TER computation
-│       │   └── benchmarks.py         # Runtime hardware profiler (latency, throughput, memory)
+│       │   ├── metrics.py                    # SacreBLEU, chrF++, and TER metric engine
+│       │   └── evaluator.py                  # FLORES-200 benchmark evaluator & markdown reports
 │       ├── serving/
-│       │   ├── api.py                # FastAPI endpoints (/translate, /health, /metrics)
-│       │   └── schemas.py            # Pydantic request/response schemas
+│       │   ├── app.py                        # FastAPI REST service (/translate, /health, /models)
+│       │   └── schemas.py                    # Pydantic request/response schemas
 │       └── utils/
-│           ├── logging.py            # Structured rich logging setup
-│           ├── seed.py               # Deterministic seed initialization
-│           └── io.py                 # File read/write utilities
+│           └── logging.py                    # Rich structured logging utilities
 ├── scripts/
-│   └── main.py                        # Unified CLI entry point for all stages
+│   └── main.py                               # Unified nmt-cli entrypoint (6 pipeline stages)
 ├── tests/
-│   ├── conftest.py                   # Pytest fixtures and mock datasets
-│   ├── test_collector.py             # Mock-based unit tests per source dispatch
-│   ├── test_preprocessor.py          # Ethiopic Unicode normalization & filtering tests
-│   ├── test_tokenizer.py             # Tokenizer roundtrip and special token tests
-│   ├── test_transformer.py           # Shape, mask, and gradient flow tests for Transformer
-│   ├── test_inference.py             # Beam search vs greedy search tests
-│   └── test_api.py                   # FastAPI test client integration tests
-├── app.py                             # Interactive Web UI (Streamlit / Gradio)
-├── Dockerfile                         # Production container image
-├── docker-compose.yml                 # Service orchestrator (API + UI)
-├── Makefile                           # Development task runner (lint, test, run, docker)
-├── .env.example                       # Environment variables template
-├── pyproject.toml                     # Modern Python build configuration & dependencies
-└── README.md                          # Comprehensive project documentation
+│   ├── test_collector.py                     # Source ingestion & streaming chunk tests
+│   ├── test_config.py                        # Config validation & hardware resolver tests
+│   ├── test_dataset.py                       # Bucketing, collate, and 4D masking tests
+│   ├── test_evaluation.py                    # BLEU, chrF++, TER metric validation tests
+│   ├── test_inference.py                     # Greedy & beam search decoding unit tests
+│   ├── test_preprocessor.py                  # Homophones, numerals, and MinHash tests
+│   ├── test_serving.py                       # FastAPI test client REST endpoint tests
+│   ├── test_tokenizer.py                     # Lossless roundtrip & special token tests
+│   ├── test_trainer.py                       # Noam scheduler & label smoothing loss tests
+│   └── test_transformer.py                   # Shape, mask, and weight-tying gradient tests
+├── app.py                                    # Interactive Streamlit Web UI
+├── Dockerfile                                # Multi-stage production container image
+├── docker-compose.yml                        # Docker Compose deployment specification
+├── Makefile                                  # Task automation (lint, format, test, serve)
+├── pyproject.toml                            # Modern Python packaging & dependencies
+└── README.md                                 # Comprehensive technical documentation
 ```
 
 ---
@@ -184,26 +204,44 @@ uv run python scripts/main.py collect --config configs/data_config.yaml --output
 uv run python scripts/main.py collect --max-samples 10000 --output-dir data/raw_sample
 ```
 
-CLI options:
-- `--config`, `-c`: Path to data configuration YAML (default: `configs/data_config.yaml`).
-- `--output-dir`, `-o`: Output folder for raw Parquet and manifest (default: `data/raw`).
-- `--max-samples`, `-n`: Cap on samples per source for quick iteration.
-- `--chunk-size`: Number of rows per PyArrow chunk for constant RAM usage (default: `500,000`).
-- `--skip`: Comma-separated source IDs to skip (e.g. `--skip ccaligned,opus_tanzil`).
+### 2. End-to-End Pipeline Execution via CLI (`nmt-cli`)
+
+The unified CLI provides 6 modular pipeline stages:
+
+```bash
+# 1. Corpus Collection: Ingest multi-source parallel corpora into chunked Parquet
+uv run python scripts/main.py collect --config configs/data_config.yaml --output-dir data/raw
+
+# 2. Preprocessing & Normalization: Clean homophones, numerals, and run MinHash deduplication
+uv run python scripts/main.py preprocess --input-file data/raw/raw_parallel_corpus.parquet --output-dir data/processed/cleaned
+
+# 3. Tokenizer Training: Train 32k ByteFallback BPE vocabulary & tokenize splits
+uv run python scripts/main.py train-tokenizer --input-file data/processed/cleaned/train.parquet --output-dir artifacts/tokenizers
+
+# 4. Model Training: Train Pre-LN Seq2Seq Transformer with dynamic length bucketing
+uv run python scripts/main.py train --train-file data/processed/tokenized/train_ids.parquet --val-file data/processed/tokenized/val_ids.parquet --epochs 30
+
+# 5. Benchmark Evaluation: Score FLORES-200 gold benchmark with SacreBLEU, chrF++, and TER
+uv run python scripts/main.py evaluate --model-path checkpoints/best_model.pt --tokenizer-path artifacts/tokenizers/joint_bpe_32k.json
+
+# 6. Production Serving: Launch FastAPI REST inference server
+uv run python scripts/main.py serve --host 0.0.0.0 --port 8000 --workers 1
+```
 
 ### 3. Interactive Web Application & Serving
 
 ```bash
-# Launch FastAPI inference server
-uv run uvicorn src.nmt_engine.serving.api:app --host 0.0.0.0 --port 8000 --reload
+# Launch FastAPI REST inference server (/docs for OpenAPI Swagger)
+uv run python scripts/main.py serve --port 8000
 
-# Launch interactive Streamlit UI
+# Launch interactive Streamlit Web UI with subword inspection
 uv run streamlit run app.py
 ```
 
 ### 4. Containerized Deployment
 
 ```bash
+# Single-command build and serve with Docker Compose
 docker compose up --build
 ```
 
@@ -211,19 +249,28 @@ docker compose up --build
 
 ## Testing & Quality Assurance
 
-The test suite validates data ingestion, Unicode normalization, script-based extraction, and model dimensions:
+The test suite validates data ingestion, Unicode normalization, script-based extraction, model dimensions, attention masking, loss functions, decoding, evaluation, and REST endpoints:
 
 ```bash
-# Run complete test suite with coverage
-uv run pytest tests/ -v
-
-# Run collector-specific unit tests
-uv run pytest tests/test_collector.py -v
+# Run complete test suite (72 unit tests across 10 test modules)
+uv run pytest -v
 
 # Run linting and code style checks
 uv run ruff check src/ tests/ configs/
 uv run ruff format --check src/ tests/
 ```
+
+**Test Coverage Summary**:
+- `tests/test_collector.py`: Streaming chunking, script fallbacks, SHA-256 manifests.
+- `tests/test_config.py`: Hardware device detection, divisibility, YAML/JSON I/O.
+- `tests/test_dataset.py`: 4D causal/pad masking, dynamic `BucketBatchSampler`.
+- `tests/test_evaluation.py`: SacreBLEU, chrF++, TER computation, markdown report generator.
+- `tests/test_inference.py`: Vectorized beam search, greedy search, repetition penalty, length penalty.
+- `tests/test_preprocessor.py`: Homophones, Ge'ez numerals, MinHash deduplication.
+- `tests/test_serving.py`: FastAPI test client endpoints (`/translate`, `/health`, `/models`, `/languages`).
+- `tests/test_tokenizer.py`: 32k ByteFallback BPE, lossless UTF-8 roundtrip, special token order.
+- `tests/test_trainer.py`: Label smoothing loss, Noam inverse-square-root schedule, checkpointing.
+- `tests/test_transformer.py`: 3-way weight tying, attention masking, Pre-LN forward/backward gradients.
 
 ---
 

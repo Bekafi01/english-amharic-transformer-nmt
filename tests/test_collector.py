@@ -79,11 +79,13 @@ def test_load_local_parallel(temp_dir: Path):
 
 def test_save_to_parquet_chunked(temp_dir: Path):
     """Verifies chunked PyArrow serialization and readback."""
-    df = pd.DataFrame({
-        "english": [f"Sentence {i}" for i in range(100)],
-        "amharic": [f"ዓረፍተ ነገር {i}" for i in range(100)],
-        "source": ["mock"] * 100,
-    })
+    df = pd.DataFrame(
+        {
+            "english": [f"Sentence {i}" for i in range(100)],
+            "amharic": [f"ዓረፍተ ነገር {i}" for i in range(100)],
+            "source": ["mock"] * 100,
+        }
+    )
 
     parquet_path = temp_dir / "chunked_output.parquet"
     collector = DataCollector()
@@ -99,17 +101,21 @@ def test_save_to_parquet_chunked(temp_dir: Path):
 def test_export_manifest(temp_dir: Path):
     """Verifies metadata manifest generation."""
     collector = DataCollector()
-    df_train = pd.DataFrame({
-        "english": ["Hi", "Bye"],
-        "amharic": ["ሰላም", "ደህና ሁን"],
-        "source": ["src_a", "src_b"],
-    })
-    df_bench = pd.DataFrame({
-        "english": ["Test"],
-        "amharic": ["ሙከራ"],
-        "source": ["flores"],
-        "split": ["dev"],
-    })
+    df_train = pd.DataFrame(
+        {
+            "english": ["Hi", "Bye"],
+            "amharic": ["ሰላም", "ደህና ሁን"],
+            "source": ["src_a", "src_b"],
+        }
+    )
+    df_bench = pd.DataFrame(
+        {
+            "english": ["Test"],
+            "amharic": ["ሙከራ"],
+            "source": ["flores"],
+            "split": ["dev"],
+        }
+    )
 
     manifest_path = collector.export_manifest(
         output_dir=temp_dir,

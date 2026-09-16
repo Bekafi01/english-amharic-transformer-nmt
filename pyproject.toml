@@ -40,6 +40,8 @@ dependencies = [
     "onnx>=1.14.0",
     "onnxruntime>=1.15.0",
     "requests>=2.31.0",
+    "datasketch>=2.0.0",
+    "langid>=1.1.6",
 ]
 
 [project.optional-dependencies]

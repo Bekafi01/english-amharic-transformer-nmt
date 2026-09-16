@@ -1,35 +1,45 @@
-# Base image with Python 3.10 slim
-FROM python:3.10-slim AS base
+# ==============================================================================
+# Multi-Stage Production Dockerfile for English-Amharic NMT REST Service
+# ==============================================================================
+FROM python:3.12-slim-bookworm AS base
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-WORKDIR /app
-
-# Install system dependencies
+# Install runtime utilities & curl for healthcheck
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
     curl \
-    git \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy dependency definition
-COPY pyproject.toml .
+WORKDIR /app
 
-# Install dependencies and package in editable mode
+# Install project dependencies
+COPY pyproject.toml README.md ./
 RUN pip install --upgrade pip && \
-    pip install -e .
+    pip install torch --index-url https://download.pytorch.org/whl/cpu && \
+    pip install .
 
-# Copy project files
-COPY configs/ configs/
-COPY src/ src/
-COPY artifacts/ artifacts/
-COPY scripts/ scripts/
-COPY app.py .
+# Copy source tree and configuration files
+COPY src/ ./src/
+COPY configs/ ./configs/
+COPY scripts/ ./scripts/
 
-EXPOSE 8000 8501
+# Create non-root application user for production security
+RUN useradd -m -u 1000 appuser && \
+    mkdir -p /app/checkpoints /app/artifacts /app/data && \
+    chown -R appuser:appuser /app
 
-# Default entrypoint runs FastAPI server
-CMD ["uvicorn", "src.nmt_engine.serving.api:app", "--host", "0.0.0.0", "--port", "8000"]
+USER appuser
+
+# Expose FastAPI REST service port
+EXPOSE 8000
+
+# Container healthcheck querying the /health endpoint
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Launch Uvicorn ASGI server hosting the NMT service
+CMD ["python", "scripts/main.py", "serve", "--host", "0.0.0.0", "--port", "8000", "--device", "cpu"]

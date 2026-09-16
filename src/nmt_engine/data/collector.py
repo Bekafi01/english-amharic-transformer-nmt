@@ -298,12 +298,14 @@ class DataCollector:
                 for row in split_data:
                     en, am = extract_pair(row)
                     if en and am:
-                        pairs.append({
-                            "english": en,
-                            "amharic": am,
-                            "source": source_name,
-                            "split": split,
-                        })
+                        pairs.append(
+                            {
+                                "english": en,
+                                "amharic": am,
+                                "source": source_name,
+                                "split": split,
+                            }
+                        )
                     if max_samples and len(pairs) >= max_samples:
                         break
                 if max_samples and len(pairs) >= max_samples:
@@ -368,7 +370,9 @@ class DataCollector:
             df = pd.DataFrame(pairs, columns=["english", "amharic"])
             df["source"] = source_name
             elapsed = time.time() - t0
-            logger.info(f"Loaded {len(df):,} verified pairs from {target_am.name} in {elapsed:.1f}s")
+            logger.info(
+                f"Loaded {len(df):,} verified pairs from {target_am.name} in {elapsed:.1f}s"
+            )
             return df
         except Exception as e:
             logger.error(f"Error reading local parallel text: {e}")
@@ -406,7 +410,9 @@ class DataCollector:
 
             # Special handling for evaluation benchmark (FLORES-200)
             if source_id == "flores":
-                df_bench = self.collect_source(source_id, item_cfg, max_samples=max_samples_per_source)
+                df_bench = self.collect_source(
+                    source_id, item_cfg, max_samples=max_samples_per_source
+                )
                 if len(df_bench) > 0:
                     df_benchmark = df_bench
                 continue
@@ -423,7 +429,7 @@ class DataCollector:
             df_train = pd.DataFrame(columns=["english", "amharic", "source"])
 
         total_elapsed = time.time() - start_time
-        logger.info(f"Acquisition complete in {total_elapsed/60:.2f} minutes")
+        logger.info(f"Acquisition complete in {total_elapsed / 60:.2f} minutes")
         logger.info(f"Total training pairs collected: {len(df_train):,}")
         logger.info(f"Total gold evaluation pairs  : {len(df_benchmark):,}")
 
@@ -441,7 +447,9 @@ class DataCollector:
         # Export benchmark Parquet
         if len(df_benchmark) > 0:
             bench_parquet = out_path / "flores200_benchmark.parquet"
-            df_benchmark.to_parquet(bench_parquet, engine="pyarrow", compression="snappy", index=False)
+            df_benchmark.to_parquet(
+                bench_parquet, engine="pyarrow", compression="snappy", index=False
+            )
 
         # Export manifest
         self.export_manifest(
@@ -465,11 +473,19 @@ class DataCollector:
 
         sample_n = min(100_000, total)
         sample = df.sample(sample_n, random_state=42)
-        fidel_pct = float(sample["amharic"].apply(lambda x: bool(ETHIOPIC_REGEX.search(str(x)))).mean())
-        latin_pct = float(sample["english"].apply(lambda x: bool(LATIN_REGEX.search(str(x)))).mean())
+        fidel_pct = float(
+            sample["amharic"].apply(lambda x: bool(ETHIOPIC_REGEX.search(str(x)))).mean()
+        )
+        latin_pct = float(
+            sample["english"].apply(lambda x: bool(LATIN_REGEX.search(str(x)))).mean()
+        )
 
-        logger.info(f"Parallel non-empty pairs: {valid_count:,} / {total:,} ({(valid_count/total)*100:.2f}%)")
-        logger.info(f"Script compliance (sample n={sample_n:,}): Amharic={fidel_pct*100:.2f}%, English={latin_pct*100:.2f}%")
+        logger.info(
+            f"Parallel non-empty pairs: {valid_count:,} / {total:,} ({(valid_count / total) * 100:.2f}%)"
+        )
+        logger.info(
+            f"Script compliance (sample n={sample_n:,}): Amharic={fidel_pct * 100:.2f}%, English={latin_pct * 100:.2f}%"
+        )
 
         return {
             "total_pairs": total,
@@ -497,11 +513,13 @@ class DataCollector:
         p = Path(output_path)
         p.parent.mkdir(parents=True, exist_ok=True)
 
-        schema = pa.schema([
-            ("english", pa.string()),
-            ("amharic", pa.string()),
-            ("source", pa.string()),
-        ])
+        schema = pa.schema(
+            [
+                ("english", pa.string()),
+                ("amharic", pa.string()),
+                ("source", pa.string()),
+            ]
+        )
 
         total_rows = len(df)
         t0 = time.time()

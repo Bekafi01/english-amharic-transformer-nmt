@@ -86,3 +86,6 @@ tensorboard/
 Thumbs.db
 desktop.ini
 *.tmp
+
+# Stray top-level checkpoints
+checkpoints/
