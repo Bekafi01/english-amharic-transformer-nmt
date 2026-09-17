@@ -57,15 +57,19 @@ def data_build(
     config: ConfigOpt,
     root: RootOpt = None,
     raw_dir: RawDirOpt = None,
-    rebuild_shards: Annotated[
-        bool, typer.Option(help="Re-stream sources even if their shard already exists.")
-    ] = False,
+    rebuild: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--rebuild",
+            help="Source name to re-stream even if its shard exists; 'all' for every source.",
+        ),
+    ] = None,
 ) -> None:
     """Stream, normalize, filter, dedup and split all configured sources."""
     from amnmt.data.pipeline import build
 
     cfg = _load(config, root, raw_dir)
-    card = build(cfg, skip_existing_shards=not rebuild_shards)
+    card = build(cfg, rebuild=set(rebuild or []))
     rprint(json.dumps({k: card[k] for k in ("sources", "dedup", "splits")}, indent=2))
 
 

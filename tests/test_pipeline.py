@@ -1,4 +1,5 @@
 import json
+import zipfile
 from pathlib import Path
 
 import pyarrow.parquet as pq
@@ -94,6 +95,7 @@ def test_build_end_to_end(workspace: tuple[Config, Path]) -> None:
         "after": 12,
         "removed": 4,
         "by_source": {"a": 10, "b": 2},
+        "score_quantiles": {},  # local_pair sources carry no scores
         "train": 11,
         "train_holdout": 1,  # capped at after // 10
     }
@@ -101,6 +103,7 @@ def test_build_end_to_end(workspace: tuple[Config, Path]) -> None:
 
     train = pq.read_table(out / "train.parquet").to_pydict()
     holdout = pq.read_table(out / "train_holdout.parquet").to_pydict()
+    assert set(train) == {"en", "am", "source", "score"} and set(train["score"]) == {None}
     all_en = set(train["en"]) | set(holdout["en"])
     all_am = set(train["am"]) | set(holdout["am"])
     assert len(all_en) == 12 and len(all_am) == 12
@@ -122,19 +125,74 @@ def test_build_end_to_end(workspace: tuple[Config, Path]) -> None:
 def test_rebuild_reuses_shards(workspace: tuple[Config, Path]) -> None:
     cfg, out = workspace
     first = build(cfg)
-    stats_mtime = (out / "shards" / "a.stats.json").stat().st_mtime_ns
-    second = build(cfg)  # default skip_existing_shards=True
-    assert (out / "shards" / "a.stats.json").stat().st_mtime_ns == stats_mtime
+    a_mtime = (out / "shards" / "a.stats.json").stat().st_mtime_ns
+    b_mtime = (out / "shards" / "b.stats.json").stat().st_mtime_ns
+    second = build(cfg)  # reuse everything
+    assert (out / "shards" / "a.stats.json").stat().st_mtime_ns == a_mtime
     assert first["dedup"] == second["dedup"]
-    third = build(cfg, skip_existing_shards=False)
+    third = build(cfg, rebuild={"b"})  # selective: only b is re-streamed
+    assert (out / "shards" / "a.stats.json").stat().st_mtime_ns == a_mtime
+    assert (out / "shards" / "b.stats.json").stat().st_mtime_ns > b_mtime
     assert third["dedup"] == first["dedup"]
+    fourth = build(cfg, rebuild={"all"})
+    assert fourth["dedup"] == first["dedup"]
     card = json.loads((out / "data_card.json").read_text(encoding="utf-8"))
     assert card["splits"] == first["splits"]
+    with pytest.raises(ValueError, match="unknown sources"):
+        build(cfg, rebuild={"nope"})
 
 
 def test_shuffle_is_deterministic(workspace: tuple[Config, Path]) -> None:
     cfg, out = workspace
     build(cfg)
     first = pq.read_table(out / "train.parquet").to_pydict()["en"]
-    build(cfg, skip_existing_shards=False)
+    build(cfg, rebuild={"all"})
     assert pq.read_table(out / "train.parquet").to_pydict()["en"] == first
+
+
+def test_legacy_shard_without_score_column_is_accepted(workspace: tuple[Config, Path]) -> None:
+    """Shards built before the `score` column existed must still merge (read as NULL)."""
+    cfg, out = workspace
+    build(cfg)
+    shard = out / "shards" / "a.parquet"
+    legacy = pq.read_table(shard).drop_columns(["score"])
+    pq.write_table(legacy, shard)
+    card = build(cfg)  # reuses the legacy shard
+    assert card["dedup"]["after"] == 12
+    assert set(pq.read_table(out / "train.parquet").to_pydict()["score"]) == {None}
+
+
+def test_opus_moses_zip_with_scores(tmp_path: Path) -> None:
+    # Duplicate pair with two scores: dedup must keep the higher-scored copy.
+    pairs = [*GOOD[:4], GOOD[0]]
+    scores = [1.10, 1.25, 0.95, 1.30, 1.40]
+    zip_path = tmp_path / "corpus.zip"
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        zf.writestr("X.am-en.en", "".join(p[0] + "\n" for p in pairs))
+        zf.writestr("X.am-en.am", "".join(p[1] + "\n" for p in pairs))
+        zf.writestr("X.am-en.scores", "".join(f"{s}\n" for s in scores))
+    for split, sample in (("dev", FLORES_DEV), ("devtest", FLORES_DEVTEST)):
+        d = tmp_path / "flores" / split
+        d.mkdir(parents=True)
+        (d / f"eng_Latn.{split}").write_text(sample[0][0] + "\n", encoding="utf-8")
+        (d / f"amh_Ethi.{split}").write_text(sample[0][1] + "\n", encoding="utf-8")
+
+    cfg = Config.model_validate(
+        {
+            "project": {"name": "t"},
+            "paths": {"root": str(tmp_path), "data_raw": "raw", "data_processed": "out"},
+            "data": {
+                "sources": [{"name": "x", "kind": "opus_moses", "url": zip_path.as_uri()}],
+                "flores": {"local_dir": str(tmp_path / "flores")},
+                "holdout_size": 0,
+            },
+        }
+    )
+    card = build(cfg)
+    assert card["dedup"]["after"] == 4
+    q = card["dedup"]["score_quantiles"]["x"]
+    assert q["min"] == 0.95 and q["max"] == 1.4
+    train = pq.read_table(tmp_path / "out" / "train.parquet").to_pydict()
+    by_en = dict(zip(train["en"], train["score"], strict=True))
+    assert by_en[GOOD[0][0]] == pytest.approx(1.40)  # higher-scored duplicate won
+    assert by_en[GOOD[2][0]] == pytest.approx(0.95)

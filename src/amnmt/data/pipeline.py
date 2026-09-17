@@ -34,6 +34,7 @@ SHARD_SCHEMA = pa.schema(
         ("en", pa.string()),
         ("am", pa.string()),
         ("source", pa.string()),
+        ("score", pa.float32()),  # source alignment score (NLLB LASER margin); null if none
         ("priority", pa.int16()),
         ("key_hash", pa.int64()),
     ]
@@ -115,7 +116,7 @@ def _build_shard(
                 col.clear()
 
     try:
-        for en_raw, am_raw in iter_source(src, raw_dir):
+        for en_raw, am_raw, score in iter_source(src, raw_dir):
             stats.read += 1
             if stats.read % _LOG_EVERY == 0:
                 log.info("  %s: %s read, %s kept", src.name, f"{stats.read:,}", f"{stats.kept:,}")
@@ -132,6 +133,7 @@ def _build_shard(
             buf["en"].append(en)
             buf["am"].append(am)
             buf["source"].append(src.name)
+            buf["score"].append(score)
             buf["priority"].append(priority)
             buf["key_hash"].append(_key_hash(key_en, key_am))
             if len(buf["en"]) >= cfg.shard_flush_rows:
@@ -176,16 +178,20 @@ def _dedup_and_split(
     try:
         con.execute("SET preserve_insertion_order = false")
         con.execute("SET memory_limit = '6GB'")
-        before = _scalar(con, f"SELECT count(*) FROM read_parquet('{glob}')")
+        before = _scalar(con, f"SELECT count(*) FROM read_parquet('{glob}', union_by_name = true)")
+        # Same normalized pair in several sources: keep the most trusted source, and within a
+        # source the best-scored copy.
         con.execute(
             f"""
             CREATE TABLE pairs AS
-            SELECT en, am, source, key_hash,
+            SELECT en, am, source, score, key_hash,
                    row_number() OVER (ORDER BY hash(xor(key_hash, {seed}::BIGINT))) AS rn
             FROM (
-                SELECT en, am, source, key_hash
-                FROM read_parquet('{glob}')
-                QUALIFY row_number() OVER (PARTITION BY key_hash ORDER BY priority) = 1
+                SELECT en, am, source, score, key_hash
+                FROM read_parquet('{glob}', union_by_name = true)
+                QUALIFY row_number() OVER (
+                    PARTITION BY key_hash ORDER BY priority, score DESC NULLS LAST
+                ) = 1
             )
             """
         )
@@ -193,11 +199,25 @@ def _dedup_and_split(
         by_source: dict[str, int] = dict(
             con.execute("SELECT source, count(*) FROM pairs GROUP BY source ORDER BY 1").fetchall()
         )
+        score_quantiles: dict[str, dict[str, float]] = {}
+        for source, *qs in con.execute(
+            """
+            SELECT source, min(score),
+                   quantile_cont(score, 0.10), quantile_cont(score, 0.25),
+                   quantile_cont(score, 0.50), quantile_cont(score, 0.75),
+                   quantile_cont(score, 0.90), max(score)
+            FROM pairs WHERE score IS NOT NULL GROUP BY source ORDER BY 1
+            """
+        ).fetchall():
+            labels = ("min", "p10", "p25", "p50", "p75", "p90", "max")
+            score_quantiles[source] = {
+                k: round(float(v), 4) for k, v in zip(labels, qs, strict=True)
+            }
         holdout = min(holdout, after // 10)
         for fname, cond in (("train_holdout", f"rn <= {holdout}"), ("train", f"rn > {holdout}")):
             target = str(out_dir / f"{fname}.parquet").replace("\\", "/")
             con.execute(
-                f"COPY (SELECT en, am, source FROM pairs WHERE {cond} ORDER BY rn) "
+                f"COPY (SELECT en, am, source, score FROM pairs WHERE {cond} ORDER BY rn) "
                 f"TO '{target}' (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 100000)"
             )
     finally:
@@ -210,6 +230,7 @@ def _dedup_and_split(
         "after": after,
         "removed": before - after,
         "by_source": by_source,
+        "score_quantiles": score_quantiles,
         "train": after - holdout,
         "train_holdout": holdout,
     }
@@ -218,10 +239,15 @@ def _dedup_and_split(
 # ---------------------------------------------------------------------------- entry
 
 
-def build(cfg: Config, *, skip_existing_shards: bool = True) -> dict[str, Any]:
+def build(cfg: Config, *, rebuild: set[str] | None = None) -> dict[str, Any]:
+    """Build the corpus. Existing shards are reused unless named in `rebuild` (or `{"all"}`)."""
     if cfg.data is None:
         raise ValueError("config has no `data` section")
     data = cfg.data
+    rebuild = rebuild or set()
+    unknown = rebuild - {s.name for s in data.sources} - {"all"}
+    if unknown:
+        raise ValueError(f"--rebuild names unknown sources: {sorted(unknown)}")
     raw_dir = cfg.paths.resolve("data_raw")
     out_dir = cfg.paths.resolve("data_processed")
     shards_dir = out_dir / "shards"
@@ -236,7 +262,8 @@ def build(cfg: Config, *, skip_existing_shards: bool = True) -> dict[str, Any]:
     per_source: list[SourceStats] = []
     for priority, src in enumerate(data.sources):
         shard = shards_dir / f"{src.name}.parquet"
-        if skip_existing_shards and shard.exists() and _stats_path(shard).exists():
+        reuse = not ({"all", src.name} & rebuild)
+        if reuse and shard.exists() and _stats_path(shard).exists():
             log.info("shard   %s exists, skipping", src.name)
             per_source.append(_load_stats(shard))
             continue

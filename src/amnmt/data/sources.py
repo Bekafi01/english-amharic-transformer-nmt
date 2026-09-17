@@ -1,6 +1,7 @@
-"""Raw parallel-corpus loaders. Each yields raw `(en, am)` string pairs lazily.
+"""Raw parallel-corpus loaders. Each yields raw `(en, am, score)` lazily.
 
-Downloads are cached in `raw_dir` and never re-fetched if the file already exists.
+`score` is the source's alignment confidence when it ships one (OPUS `.scores` = LASER margin),
+else None. Downloads are cached in `raw_dir` and never re-fetched if the file already exists.
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ import itertools
 import urllib.request
 import zipfile
 from collections.abc import Iterator
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +21,7 @@ from amnmt.core.logging import get_logger
 log = get_logger(__name__)
 
 Pair = tuple[str, str]
+ScoredPair = tuple[str, str, float | None]
 
 
 def download(url: str, dest: Path) -> Path:
@@ -33,26 +36,38 @@ def download(url: str, dest: Path) -> Path:
     return dest
 
 
-def _limit(pairs: Iterator[Pair], max_pairs: int | None) -> Iterator[Pair]:
+def _limit(pairs: Iterator[ScoredPair], max_pairs: int | None) -> Iterator[ScoredPair]:
     return itertools.islice(pairs, max_pairs) if max_pairs else pairs
+
+
+def _parse_score(line: str) -> float | None:
+    try:
+        return float(line)
+    except ValueError:
+        return None
 
 
 # ---------------------------------------------------------------------------- opus_moses
 
 
-def iter_opus_moses(url: str, raw_dir: Path, name: str) -> Iterator[Pair]:
-    """OPUS 'moses' zips contain two aligned plain-text files: `<corpus>.am-en.en` / `.am`."""
+def iter_opus_moses(url: str, raw_dir: Path, name: str) -> Iterator[ScoredPair]:
+    """OPUS 'moses' zips hold aligned `<corpus>.am-en.en` / `.am`, sometimes also `.scores`."""
     zip_path = download(url, raw_dir / f"{name}.zip")
-    with zipfile.ZipFile(zip_path) as zf:
+    with zipfile.ZipFile(zip_path) as zf, ExitStack() as stack:
         names = zf.namelist()
-        en_name = next(n for n in names if n.endswith(".en"))
-        am_name = next(n for n in names if n.endswith(".am"))
-        with (
-            io.TextIOWrapper(zf.open(en_name), encoding="utf-8", errors="replace") as fen,
-            io.TextIOWrapper(zf.open(am_name), encoding="utf-8", errors="replace") as fam,
-        ):
-            for en, am in zip(fen, fam, strict=False):
-                yield en.rstrip("\n"), am.rstrip("\n")
+
+        def open_text(suffix: str) -> io.TextIOWrapper:
+            member = next(n for n in names if n.endswith(suffix))
+            return stack.enter_context(
+                io.TextIOWrapper(zf.open(member), encoding="utf-8", errors="replace")
+            )
+
+        fen, fam = open_text(".en"), open_text(".am")
+        has_scores = any(n.endswith(".scores") for n in names)
+        fscores = open_text(".scores") if has_scores else itertools.repeat("")
+        log.info("%s: scores %s", name, "present" if has_scores else "absent")
+        for en, am, sc in zip(fen, fam, fscores, strict=False):
+            yield en.rstrip("\n"), am.rstrip("\n"), _parse_score(sc) if has_scores else None
 
 
 # ---------------------------------------------------------------------------- hf
@@ -67,30 +82,30 @@ def _dig(row: dict[str, Any], dotted: str) -> str:
 
 def iter_hf(
     path: str, subset: str | None, split: str, en_column: str, am_column: str
-) -> Iterator[Pair]:
+) -> Iterator[ScoredPair]:
     from datasets import load_dataset
 
     ds = load_dataset(path, subset, split=split, streaming=True)
     for row in ds:
-        yield _dig(row, en_column), _dig(row, am_column)
+        yield _dig(row, en_column), _dig(row, am_column), None
 
 
 # ---------------------------------------------------------------------------- local_pair
 
 
-def iter_local_pair(en_file: Path, am_file: Path) -> Iterator[Pair]:
+def iter_local_pair(en_file: Path, am_file: Path) -> Iterator[ScoredPair]:
     with (
         en_file.open(encoding="utf-8", errors="replace") as fen,
         am_file.open(encoding="utf-8", errors="replace") as fam,
     ):
         for en, am in zip(fen, fam, strict=False):
-            yield en.rstrip("\n"), am.rstrip("\n")
+            yield en.rstrip("\n"), am.rstrip("\n"), None
 
 
 # ---------------------------------------------------------------------------- dispatch
 
 
-def iter_source(src: SourceConfig, raw_dir: Path) -> Iterator[Pair]:
+def iter_source(src: SourceConfig, raw_dir: Path) -> Iterator[ScoredPair]:
     if src.kind == "opus_moses":
         assert src.url is not None
         pairs = iter_opus_moses(src.url, raw_dir, src.name)
