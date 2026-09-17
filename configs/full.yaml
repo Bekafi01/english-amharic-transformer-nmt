@@ -1,0 +1,45 @@
+# Full-scale corpus. Runs on Colab/Kaggle; outputs go to Drive via `--root`.
+project:
+  name: full
+  seed: 42
+  device: auto
+
+paths:
+  root: .
+  data_raw: data/raw
+  data_processed: data/processed/full
+  artifacts: artifacts/full
+
+data:
+  # Order = trust priority: when a normalized pair appears in several sources, the first wins.
+  sources:
+    - name: human_curated
+      kind: local_pair
+      en_file: /content/drive/MyDrive/Internship/MT/Data/eng_data.txt
+      am_file: /content/drive/MyDrive/Internship/MT/Data/am_data.txt
+      license: human-verified (private)
+    - name: mt560
+      kind: hf
+      path: michsethowusu/english-amharic_sentence-pairs_mt560
+      en_column: eng
+      am_column: amh
+      license: CC-BY-4.0
+    - name: opus100
+      kind: hf
+      path: Helsinki-NLP/opus-100
+      subset: am-en
+      license: mixed (OPUS)
+    - name: tanzil
+      kind: opus_moses
+      url: https://object.pouta.csc.fi/OPUS-Tanzil/v1/moses/am-en.txt.zip
+      license: Tanzil
+    - name: ccaligned
+      kind: opus_moses
+      url: https://object.pouta.csc.fi/OPUS-CCAligned/v1/moses/am-en.txt.zip
+      license: CC (web crawl)
+    - name: nllb
+      kind: opus_moses
+      url: https://object.pouta.csc.fi/OPUS-NLLB/v1/moses/am-en.txt.zip
+      license: CC-BY-NC-4.0 (Meta, LASER-mined)
+  holdout_size: 2000
+  shard_flush_rows: 200000

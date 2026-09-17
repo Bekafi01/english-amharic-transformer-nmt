@@ -43,7 +43,7 @@ Contracts are declared in `pyproject.toml` under `[tool.importlinter]`.
 
 ## Phases
 
-### Phase 0 — Foundation `[~]`
+### Phase 0 — Foundation `[x]`
 
 Deliverables
 
@@ -60,26 +60,26 @@ Milestone check
 
 - `uv sync && uv run pytest && uv run ruff check . && uv run lint-imports` all green locally and in CI.
 
-### Phase 1 — Data `[ ]`
+### Phase 1 — Data `[~]`
 
 Deliverables
 
-- `data/sources.py`: one loader per source (HF `datasets` streaming), each returning an iterator of `(en, am, source_id)`
-- `data/normalize.py`: Ethiopic normalizer (homophone folding, punctuation, numerals) — pure functions
-- `data/filters.py`: length ratio, language-id, script-ratio, min/max length filters — pure functions
-- `data/dedup.py`: exact + MinHash near-dup removal
-- `data/pipeline.py`: `collect → normalize → filter → dedup → split → parquet`, chunked, bounded memory
-- `data/flores.py`: FLORES-200 loader (eval-only), plus contamination check against train
-- CLI: `amnmt data build --config configs/<name>.yaml`
-- `docs/data_card.md`: per-source counts, filter drop rates, final split sizes
+- `data/sources.py`: three loaders — `opus_moses` (OPUS zip), `hf` (HF datasets, streaming), `local_pair` (two aligned text files) — each yielding `(en, am)`
+- `data/normalize.py`: NFC, Ethiopic wordspace/punctuation, homophone folding (flag), Ge'ez numerals → digits, light detokenization — pure functions
+- `data/filters.py`: empty/length/ratio/script-share/copy/URL filters — pure functions returning a reject reason or `None`
+- `data/flores.py`: FLORES-200 dev/devtest from the official tarball (eval-only)
+- `data/pipeline.py`: per source `stream → normalize → filter → parquet shard` (chunked, bounded memory); then DuckDB exact-dedup on a normalized key, FLORES exclusion, holdout split, `data_card.json`
+- CLI: `amnmt data build --config configs/<name>.yaml [--root DIR] [--raw-dir DIR]`
+- Outputs under `paths.data_processed`: `shards/<source>.parquet`, `train.parquet`, `train_holdout.parquet`, `valid.parquet` (FLORES dev), `test.parquet` (FLORES devtest), `data_card.json`
 
 Milestone check
 
-- `tiny` config builds in < 2 min on CPU; `tests/test_data_*.py` cover every normalizer/filter rule with Amharic examples.
-- `tests/test_no_flores_leak.py` asserts 0 train sentences appear in FLORES dev/devtest.
-- Data card committed with numbers.
+- `tests/test_normalize.py`, `tests/test_filters.py` cover every rule with Amharic examples.
+- `tests/test_pipeline.py` runs the full build on a synthetic `local_pair` source + fake FLORES in `tmp_path` and asserts 0 FLORES sentences in train.
+- `tiny` config (5k pairs/source) builds on Colab; `data_card.json` pasted into `docs/milestones/phase1_data_tiny.md`.
+- `full` config builds on Colab; card committed to `docs/milestones/phase1_data_full.md`.
 
-Scale ladder: tiny (10k pairs) → small (500k) → full.
+Scale ladder: tiny (5k/source) → full. (No `small` for data: filtering is linear; `small` is a training-time subsample.)
 
 ### Phase 2 — Tokenization `[ ]`
 
@@ -176,14 +176,19 @@ Milestone check
 
 ## Decisions (change here, not ad hoc)
 
-| #   | Decision                                                                                                          | Rationale                                                                                      |
-| --- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| D1  | Single bidirectional model with target-language tag (`<2am>`, `<2en>`)                                            | Halves training/serving cost; joint vocab already shared. Revisit if one direction lags badly. |
-| D2  | Joint 32k BPE with byte fallback                                                                                  | Proven in v1; no `<unk>` for rare Ethiopic glyphs.                                             |
-| D3  | Pre-LN Transformer, base size (d=512, 6+6, h=8, ff=2048) for `full`; d=256, 3+3 for `small`; d=64, 2+2 for `tiny` | Pre-LN is stable without careful warmup on Colab-length runs.                                  |
-| D4  | Token-budget batching (e.g. 8k tokens/batch on T4 with AMP) rather than fixed sentence count                      | Stable memory, less padding.                                                                   |
-| D5  | Training runs on Colab/Kaggle; local machine is CPU-only and used for `tiny` checks and tests                     | Matches available hardware.                                                                    |
-| D6  | uv for env/lock; Python 3.12                                                                                      | Already in place.                                                                              |
+| #   | Decision                                                                                                                                              | Rationale                                                                                                |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| D1  | Single bidirectional model with target-language tag (`<2am>`, `<2en>`)                                                                                | Halves training/serving cost; joint vocab already shared. Revisit if one direction lags badly.           |
+| D2  | Joint 32k BPE with byte fallback                                                                                                                      | Proven in v1; no `<unk>` for rare Ethiopic glyphs.                                                       |
+| D3  | Pre-LN Transformer, base size (d=512, 6+6, h=8, ff=2048) for `full`; d=256, 3+3 for `small`; d=64, 2+2 for `tiny`                                     | Pre-LN is stable without careful warmup on Colab-length runs.                                            |
+| D4  | Token-budget batching (e.g. 8k tokens/batch on T4 with AMP) rather than fixed sentence count                                                          | Stable memory, less padding.                                                                             |
+| D5  | Training runs on Colab/Kaggle; local machine is CPU-only and used for `tiny` checks and tests                                                         | Matches available hardware.                                                                              |
+| D6  | uv for env/lock; Python 3.12                                                                                                                          | Already in place.                                                                                        |
+| D7  | Exact dedup on a normalized key (lowercase, punctuation/whitespace stripped) via DuckDB; **no MinHash**                                               | MinHash over 17M pairs is hours of Python on Colab; the normalized key catches most near-dups.           |
+| D8  | No language-ID model; script-share filters only                                                                                                       | For en–am the script test does the job; avoids a 130 MB fastText download. Revisit if Tigrinya leaks in. |
+| D9  | `valid` = FLORES-200 dev, `test` = FLORES-200 devtest; a 2k random `train_holdout` for loss monitoring                                                | Gold references; no leakage risk from carving noisy train data.                                          |
+| D10 | Homophone folding ON for both sides (config flag). Evaluation reports scores against folded **and** raw references                                    | The model can only emit folded forms; scoring only against raw refs would understate quality.            |
+| D11 | Heavy compute (data build, training) runs on Colab/Kaggle via `git clone` + `pip install -e .[data]` + `amnmt …`; local machine writes code and tests | User's workflow. Raw downloads go to local Colab disk (`--raw-dir`), outputs to Drive (`--root`).        |
 
 ## Definition of done for the whole project
 

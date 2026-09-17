@@ -13,6 +13,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+          python-version: "3.12"
       - run: uv sync --all-extras --group dev
       - run: uv run ruff check .
       - run: uv run ruff format --check .

@@ -7,5 +7,34 @@ project:
 paths:
   root: .
   data_raw: data/raw
-  data_processed: data/processed
+  data_processed: data/processed/tiny
   artifacts: artifacts/tiny
+
+data:
+  # First N pairs of each source. Downloads are still full-size (cached in data_raw).
+  sources:
+    - name: mt560
+      kind: hf
+      path: michsethowusu/english-amharic_sentence-pairs_mt560
+      en_column: eng
+      am_column: amh
+      license: CC-BY-4.0
+      max_pairs: 5000
+    - name: opus100
+      kind: hf
+      path: Helsinki-NLP/opus-100
+      subset: am-en
+      license: mixed (OPUS)
+      max_pairs: 5000
+    - name: tanzil
+      kind: opus_moses
+      url: https://object.pouta.csc.fi/OPUS-Tanzil/v1/moses/am-en.txt.zip
+      license: Tanzil
+      max_pairs: 5000
+    - name: ccaligned
+      kind: opus_moses
+      url: https://object.pouta.csc.fi/OPUS-CCAligned/v1/moses/am-en.txt.zip
+      license: CC (web crawl)
+      max_pairs: 5000
+  holdout_size: 500
+  shard_flush_rows: 10000
