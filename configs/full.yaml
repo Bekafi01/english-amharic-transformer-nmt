@@ -12,12 +12,8 @@ paths:
 
 data:
   # Order = trust priority: when a normalized pair appears in several sources, the first wins.
+  # All sources are public and documented in README (Data section).
   sources:
-    - name: human_curated
-      kind: local_pair
-      en_file: /content/drive/MyDrive/Internship/MT/Data/eng_data.txt
-      am_file: /content/drive/MyDrive/Internship/MT/Data/am_data.txt
-      license: human-verified (private)
     - name: mt560
       kind: hf
       path: michsethowusu/english-amharic_sentence-pairs_mt560

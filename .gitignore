@@ -27,3 +27,6 @@ artifacts/*
 !artifacts/.gitkeep
 
 # Docs milestones are tracked (small md/json). Everything else under artifacts is not.
+
+# Working notes (plan, milestone logs) stay local
+docs/internal/
