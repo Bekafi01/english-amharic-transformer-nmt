@@ -28,5 +28,6 @@ artifacts/*
 
 # Docs milestones are tracked (small md/json). Everything else under artifacts is not.
 
-# Working notes (plan, milestone logs) stay local
+# Working notes (plan, milestone logs) and Colab runner notebooks stay local
 docs/internal/
+notebooks/
