@@ -147,15 +147,17 @@ class Trainer:
         return path
 
     def load(self, path: Path) -> None:
-        ckpt = torch.load(path, map_location=self.device, weights_only=False)
+        # Load on CPU: load_state_dict() moves tensors to the module/optimizer device itself,
+        # and torch.set_rng_state requires a *CPU* ByteTensor (map_location=cuda broke resume).
+        ckpt = torch.load(path, map_location="cpu", weights_only=False)
         self.model.load_state_dict(ckpt["model"])
         self.optimizer.load_state_dict(ckpt["optimizer"])
         self.scheduler.load_state_dict(ckpt["scheduler"])
         self.scaler.load_state_dict(ckpt["scaler"])
         self.state = TrainState(**ckpt["state"])
-        torch.set_rng_state(ckpt["rng"]["torch"])
+        torch.set_rng_state(ckpt["rng"]["torch"].cpu())
         if ckpt["rng"]["cuda"] is not None and torch.cuda.is_available():
-            torch.cuda.set_rng_state_all(ckpt["rng"]["cuda"])
+            torch.cuda.set_rng_state_all([s.cpu() for s in ckpt["rng"]["cuda"]])
         log.info("resumed from %s at step %s", path.name, self.state.step)
 
     # ------------------------------------------------------------------ eval
