@@ -1,10 +1,14 @@
-"""Show how the trained tokenizer segments a few sentences. Usage: python scripts/peek_tokens.py <tokenizer.json>"""
+"""Show how the trained tokenizer segments a few sentences.
+
+Usage: python scripts/peek_tokens.py <tokenizer.json>
+"""
 
 import sys
 
 from amnmt.tokenization.tokenizer import Tokenizer
 
-tok = Tokenizer.from_file(sys.argv[1] if len(sys.argv) > 1 else "artifacts/tiny/tokenizer/tokenizer.json")
+DEFAULT = "artifacts/tiny/tokenizer/tokenizer.json"
+tok = Tokenizer.from_file(sys.argv[1] if len(sys.argv) > 1 else DEFAULT)
 for s in [
     "The children are playing in the garden.",
     "Addis Ababa is the capital of Ethiopia.",
