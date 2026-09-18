@@ -29,7 +29,7 @@ make check      # ruff + import-linter + mypy + pytest
 
 ```bash
 git clone https://github.com/Bekafi01/english-amharic-transformer-nmt.git repo && cd repo
-pip install -q -e ".[data]"
+pip install -q -e ".[data,tokenization,evaluation]"
 # --root: persistent output dir (Drive / Kaggle working); --raw-dir: fast local disk for downloads
 amnmt data build -c configs/tiny.yaml --root /content/drive/MyDrive/amnmt --raw-dir /content/raw
 amnmt data build -c configs/full.yaml --root /content/drive/MyDrive/amnmt --raw-dir /content/raw

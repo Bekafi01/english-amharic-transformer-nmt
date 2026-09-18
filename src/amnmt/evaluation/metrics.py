@@ -10,8 +10,11 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 
-from sacrebleu.metrics.bleu import BLEU
-from sacrebleu.metrics.chrf import CHRF
+try:
+    from sacrebleu.metrics.bleu import BLEU
+    from sacrebleu.metrics.chrf import CHRF
+except ImportError as e:  # pragma: no cover
+    raise ImportError("sacrebleu is required: pip install 'amnmt[evaluation]'") from e
 
 
 @dataclass(frozen=True)
