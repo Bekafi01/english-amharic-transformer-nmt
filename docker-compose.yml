@@ -20,4 +20,15 @@ services:
     environment:
       AMNMT_CHECKPOINT: /models/runs/base_medium/best.pt
       AMNMT_DEVICE: cpu
-    command: ["streamlit", "run", "app.py", "--server.address", "0.0.0.0", "--server.port", "8501", "--server.headless", "true"]
+    command:
+      [
+        "streamlit",
+        "run",
+        "app.py",
+        "--server.address",
+        "0.0.0.0",
+        "--server.port",
+        "8501",
+        "--server.headless",
+        "true",
+      ]

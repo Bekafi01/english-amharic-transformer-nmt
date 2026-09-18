@@ -55,7 +55,7 @@ addopts = "-q --strict-markers"
 markers = ["slow: takes more than a few seconds; skipped in the default CI run"]
 filterwarnings = [
     "ignore:enable_nested_tensor is True:UserWarning",
-    "ignore:Using `httpx` with `starlette.testclient`:DeprecationWarning",
+    "ignore:Using `httpx` with `starlette.testclient`:",
     "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning",
 ]
 

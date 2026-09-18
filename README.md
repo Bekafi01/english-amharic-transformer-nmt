@@ -14,14 +14,14 @@ make check      # ruff + import-linter + mypy + pytest
 
 ## Pipeline
 
-| Stage        | Command                                                                              | Output                                                                           |
-| ------------ | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| Corpus build | `amnmt data build -c configs/full.yaml [--root DIR] [--raw-dir DIR]`                 | `data/processed/full/{train,train_holdout,valid,test}.parquet`, `data_card.json` |
-| Tokenizer    | `amnmt tokenizer train -c configs/full.yaml [--root DIR]`                            | `artifacts/full/tokenizer/{tokenizer.json,stats.json}`                           |
-| Training     | `amnmt train -c configs/full.yaml [--root DIR] --run NAME --resume --time-limit MIN` | `artifacts/full/runs/NAME/{last.pt,best.pt,metrics.jsonl}`                       |
-| Translate    | `amnmt translate -m best.pt -d en-am "text" [--beam 4]`                              | stdout                                                                           |
-| Evaluation   | `amnmt eval -m best.pt -c configs/full.yaml [--root DIR] --split test [--spbleu]`    | `runs/NAME/eval_test_beam4.{json,md}` (BLEU, chrF++, spBLEU, both directions)    |
-| Serving      | `amnmt serve -m best.pt [--port 8000]` · `streamlit run app.py` · `docker compose up`         | REST `POST /translate`, `GET /health`, OpenAPI at `/docs`; Streamlit UI on :8501             |
+| Stage        | Command                                                                               | Output                                                                           |
+| ------------ | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Corpus build | `amnmt data build -c configs/full.yaml [--root DIR] [--raw-dir DIR]`                  | `data/processed/full/{train,train_holdout,valid,test}.parquet`, `data_card.json` |
+| Tokenizer    | `amnmt tokenizer train -c configs/full.yaml [--root DIR]`                             | `artifacts/full/tokenizer/{tokenizer.json,stats.json}`                           |
+| Training     | `amnmt train -c configs/full.yaml [--root DIR] --run NAME --resume --time-limit MIN`  | `artifacts/full/runs/NAME/{last.pt,best.pt,metrics.jsonl}`                       |
+| Translate    | `amnmt translate -m best.pt -d en-am "text" [--beam 4]`                               | stdout                                                                           |
+| Evaluation   | `amnmt eval -m best.pt -c configs/full.yaml [--root DIR] --split test [--spbleu]`     | `runs/NAME/eval_test_beam4.{json,md}` (BLEU, chrF++, spBLEU, both directions)    |
+| Serving      | `amnmt serve -m best.pt [--port 8000]` · `streamlit run app.py` · `docker compose up` | REST `POST /translate`, `GET /health`, OpenAPI at `/docs`; Streamlit UI on :8501 |
 
 `configs/tiny.yaml` runs the same pipeline on a few thousand pairs and must always work.
 
