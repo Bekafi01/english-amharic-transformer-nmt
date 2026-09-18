@@ -179,5 +179,26 @@ def evaluate(
     )
 
 
+@app.command()
+def serve(
+    checkpoint: Annotated[Path, typer.Option("--checkpoint", "-m", help="best.pt")],
+    tokenizer: Path | None = None,
+    device: Annotated[str | None, typer.Option(help="cpu | cuda (default auto)")] = None,
+    host: str = "127.0.0.1",
+    port: int = 8000,
+) -> None:
+    """Serve the REST API (Phase 8): POST /translate, GET /health, docs at /docs."""
+    import os
+
+    import uvicorn
+
+    os.environ["AMNMT_CHECKPOINT"] = str(checkpoint)
+    if tokenizer is not None:
+        os.environ["AMNMT_TOKENIZER"] = str(tokenizer)
+    if device is not None:
+        os.environ["AMNMT_DEVICE"] = device
+    uvicorn.run("amnmt.serving.app:app", host=host, port=port)
+
+
 if __name__ == "__main__":
     app()

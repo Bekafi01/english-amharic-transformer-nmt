@@ -21,7 +21,7 @@ make check      # ruff + import-linter + mypy + pytest
 | Training     | `amnmt train -c configs/full.yaml [--root DIR] --run NAME --resume --time-limit MIN` | `artifacts/full/runs/NAME/{last.pt,best.pt,metrics.jsonl}`                       |
 | Translate    | `amnmt translate -m best.pt -d en-am "text" [--beam 4]`                              | stdout                                                                           |
 | Evaluation   | `amnmt eval -m best.pt -c configs/full.yaml [--root DIR] --split test [--spbleu]`    | `runs/NAME/eval_test_beam4.{json,md}` (BLEU, chrF++, spBLEU, both directions)    |
-| Serving      | _Phase 8_                                                                            |                                                                                  |
+| Serving      | `amnmt serve -m best.pt [--port 8000]` · `streamlit run app.py` · `docker compose up`         | REST `POST /translate`, `GET /health`, OpenAPI at `/docs`; Streamlit UI on :8501             |
 
 `configs/tiny.yaml` runs the same pipeline on a few thousand pairs and must always work.
 

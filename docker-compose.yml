@@ -1,0 +1,23 @@
+# docker compose up --build
+# Expects ./artifacts/full/{runs/base_medium/best.pt, tokenizer/tokenizer.json} on the host
+# (copy them from Drive). API on :8000 (docs at /docs), UI on :8501.
+services:
+  api:
+    build: .
+    image: amnmt
+    ports: ["8000:8000"]
+    volumes: ["./artifacts/full:/models:ro"]
+    environment:
+      AMNMT_CHECKPOINT: /models/runs/base_medium/best.pt
+      AMNMT_DEVICE: cpu
+    restart: unless-stopped
+
+  ui:
+    image: amnmt
+    depends_on: [api]
+    ports: ["8501:8501"]
+    volumes: ["./artifacts/full:/models:ro"]
+    environment:
+      AMNMT_CHECKPOINT: /models/runs/base_medium/best.pt
+      AMNMT_DEVICE: cpu
+    command: ["streamlit", "run", "app.py", "--server.address", "0.0.0.0", "--server.port", "8501", "--server.headless", "true"]
