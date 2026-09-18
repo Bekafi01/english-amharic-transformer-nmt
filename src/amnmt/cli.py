@@ -114,5 +114,34 @@ def train(
     rprint(json.dumps(asdict(state), indent=2))
 
 
+@app.command()
+def translate(
+    checkpoint: Annotated[Path, typer.Option("--checkpoint", "-m", help="best.pt / last.pt")],
+    direction: Annotated[str, typer.Option("--direction", "-d", help="en-am or am-en")],
+    text: Annotated[list[str] | None, typer.Argument(help="Sentences to translate.")] = None,
+    input_file: Annotated[
+        Path | None, typer.Option("--input", "-i", help="File with one sentence per line.")
+    ] = None,
+    tokenizer: Annotated[
+        Path | None, typer.Option(help="tokenizer.json (default: <artifacts>/tokenizer/).")
+    ] = None,
+    beam: Annotated[int, typer.Option(help="Beam size; 1 = greedy.")] = 4,
+    length_penalty: float = 1.0,
+) -> None:
+    """Translate sentences with a trained checkpoint (Phase 5)."""
+    from amnmt.inference.translator import Translator
+
+    sentences = list(text or [])
+    if input_file is not None:
+        sentences += input_file.read_text(encoding="utf-8").splitlines()
+    if not sentences:
+        raise typer.BadParameter("give sentences as arguments or via --input")
+    if direction not in ("en-am", "am-en"):
+        raise typer.BadParameter("direction must be en-am or am-en")
+    tr = Translator.from_checkpoint(checkpoint, tokenizer)
+    for out in tr.translate(sentences, direction, beam_size=beam, length_penalty=length_penalty):  # type: ignore[arg-type]
+        print(out)
+
+
 if __name__ == "__main__":
     app()
