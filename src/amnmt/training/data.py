@@ -250,6 +250,7 @@ class TokenBudgetBatchSampler(Sampler[list[int]]):
         self.seed = seed
         self.epoch = 0
         self.skip = 0
+        self._cache: tuple[int, list[list[int]]] | None = None  # (epoch, batches)
         if lengths.max(initial=0) > batch_tokens:
             raise ValueError("batch_tokens smaller than the longest sample")
 
@@ -257,6 +258,8 @@ class TokenBudgetBatchSampler(Sampler[list[int]]):
         self.epoch, self.skip = epoch, skip
 
     def batches(self) -> list[list[int]]:
+        if self._cache is not None and self._cache[0] == self.epoch:
+            return self._cache[1]
         rng = np.random.default_rng(self.seed + self.epoch)
         perm = rng.permutation(len(self.lengths))
         pool_size = max(self.batch_tokens // max(int(self.lengths.mean()), 1) * 100, 1)
@@ -277,7 +280,9 @@ class TokenBudgetBatchSampler(Sampler[list[int]]):
             if cur:
                 batches.append(cur)
         order = rng.permutation(len(batches))
-        return [batches[i] for i in order]
+        result = [batches[i] for i in order]
+        self._cache = (self.epoch, result)
+        return result
 
     def __iter__(self) -> Iterator[list[int]]:
         return iter(self.batches()[self.skip :])
