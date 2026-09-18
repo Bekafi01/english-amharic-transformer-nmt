@@ -18,8 +18,10 @@ from amnmt.core.config import Config, load_config
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 config_app = typer.Typer(help="Inspect and validate experiment configs.")
 data_app = typer.Typer(help="Build the parallel corpus (Phase 1).")
+tokenizer_app = typer.Typer(help="Train the joint BPE tokenizer (Phase 2).")
 app.add_typer(config_app, name="config")
 app.add_typer(data_app, name="data")
+app.add_typer(tokenizer_app, name="tokenizer")
 
 ConfigOpt = Annotated[Path, typer.Option("--config", "-c", help="YAML config path.")]
 RootOpt = Annotated[
@@ -71,6 +73,15 @@ def data_build(
     cfg = _load(config, root, raw_dir)
     card = build(cfg, rebuild=set(rebuild or []))
     rprint(json.dumps({k: card[k] for k in ("sources", "dedup", "splits")}, indent=2))
+
+
+@tokenizer_app.command("train")
+def tokenizer_train(config: ConfigOpt, root: RootOpt = None) -> None:
+    """Sample train.parquet and train the joint BPE tokenizer into <artifacts>/tokenizer/."""
+    from amnmt.tokenization.train import train
+
+    stats = train(_load(config, root, None))
+    rprint(json.dumps(stats, indent=2))
 
 
 if __name__ == "__main__":

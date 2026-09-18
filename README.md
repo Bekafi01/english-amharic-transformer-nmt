@@ -55,6 +55,11 @@ Preprocessing (`amnmt.data`): NFC, Ethiopic homophone folding, Ge'ez numerals �
 `፡` → space, Moses detokenization, then length/ratio/script-share/URL/markup filters and exact
 dedup on a normalized key. Per-source keep/reject counts are written to `data_card.json`.
 
+Tokenizer (`amnmt.tokenization`): one joint 32k BPE for both languages (HF `tokenizers`), Metaspace
+word split, isolated punctuation, individual digits, byte fallback (no `<unk>` ever). Specials:
+`<pad>=0 <s>=1 </s>=2 <unk>=3 <2am>=4 <2en>=5`. Trained on a seeded reservoir sample of the
+score-filtered training subset.
+
 ## Layout
 
 ```

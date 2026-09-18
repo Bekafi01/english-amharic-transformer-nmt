@@ -39,3 +39,11 @@ data:
       license: CC-BY-NC-4.0 (Meta, LASER-mined)
   holdout_size: 2000
   shard_flush_rows: 200000
+
+tokenizer:
+  vocab_size: 32000
+  sample_per_lang: 2000000
+  # Train the vocab on the medium-quality subset so noisy NLLB tail does not shape merges.
+  subset:
+    min_score:
+      nllb: 1.068

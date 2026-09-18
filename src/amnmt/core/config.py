@@ -6,11 +6,14 @@ rejected so a typo in a YAML file fails fast instead of silently using a default
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+_IDENT = r"^[a-z][a-z0-9_]*$"  # source names are interpolated into SQL; keep them plain
 
 
 class _Strict(BaseModel):
@@ -42,7 +45,7 @@ class PathsConfig(_Strict):
 class SourceConfig(_Strict):
     """One parallel-corpus source. Required fields depend on `kind`."""
 
-    name: str
+    name: str = Field(pattern=_IDENT)
     kind: Literal["opus_moses", "hf", "local_pair"]
     license: str = ""
     max_pairs: int | None = None
@@ -112,10 +115,47 @@ class DataConfig(_Strict):
         return self
 
 
+# ------------------------------------------------------------------ Phase 2: tokenizer
+
+
+class SubsetConfig(_Strict):
+    """Which rows of train.parquet to use. Shared by tokenizer training and model training."""
+
+    sources: list[str] | None = None  # None = all sources
+    min_score: dict[str, float] = Field(
+        default_factory=dict
+    )  # per-source floor, e.g. {nllb: 1.068}
+
+    @model_validator(mode="after")
+    def _plain_names(self) -> SubsetConfig:
+        for name in [*(self.sources or []), *self.min_score]:
+            if not re.fullmatch(_IDENT, name):
+                raise ValueError(f"source name {name!r} must match {_IDENT}")
+        return self
+
+    def sql_where(self) -> str:
+        clauses: list[str] = []
+        if self.sources is not None:
+            quoted = ", ".join(f"'{s}'" for s in self.sources)
+            clauses.append(f"source IN ({quoted})")
+        for src, floor in self.min_score.items():
+            clauses.append(f"(source <> '{src}' OR score >= {float(floor)})")
+        return " AND ".join(clauses) if clauses else "TRUE"
+
+
+class TokenizerConfig(_Strict):
+    vocab_size: int = 32_000
+    min_frequency: int = 2
+    # Sentences per language sampled (reservoir, seeded) from the subset for BPE training.
+    sample_per_lang: int = 2_000_000
+    subset: SubsetConfig = Field(default_factory=SubsetConfig)
+
+
 class Config(_Strict):
     project: ProjectConfig
     paths: PathsConfig = Field(default_factory=PathsConfig)
     data: DataConfig | None = None
+    tokenizer: TokenizerConfig | None = None
 
     def with_paths(self, **overrides: Path) -> Config:
         return self.model_copy(update={"paths": self.paths.model_copy(update=overrides)})

@@ -38,3 +38,7 @@ data:
       max_pairs: 5000
   holdout_size: 500
   shard_flush_rows: 10000
+
+tokenizer:
+  vocab_size: 4000
+  sample_per_lang: 20000
