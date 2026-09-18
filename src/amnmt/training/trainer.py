@@ -109,7 +109,8 @@ class Trainer:
         self.scaler = torch.amp.GradScaler(enabled=use_amp and self.amp_dtype == torch.float16)
         self.state = TrainState()
         if self.device.type == "cuda":
-            log.info("gpu %s (sm_%d%d)", torch.cuda.get_device_name(self.device), *torch.cuda.get_device_capability(self.device))  # fmt: skip
+            major, minor = torch.cuda.get_device_capability(self.device)
+            log.info("gpu %s (sm_%d%d)", torch.cuda.get_device_name(self.device), major, minor)
         log.info(
             "device=%s amp=%s params=%s train_pairs=%s samples=%s batches/epoch=%s",
             self.device,
