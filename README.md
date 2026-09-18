@@ -14,13 +14,13 @@ make check      # ruff + import-linter + mypy + pytest
 
 ## Pipeline
 
-| Stage        | Command                                                                               | Output                                                                           |
-| ------------ | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Corpus build | `amnmt data build -c configs/full.yaml [--root DIR] [--raw-dir DIR]`                  | `data/processed/full/{train,train_holdout,valid,test}.parquet`, `data_card.json` |
-| Tokenizer    | `amnmt tokenizer train -c configs/full.yaml [--root DIR]`                             | `artifacts/full/tokenizer/{tokenizer.json,stats.json}`                           |
-| Training     | `amnmt train -c configs/full.yaml [--root DIR] --run NAME --resume --time-limit MIN`  | `artifacts/full/runs/NAME/{last.pt,best.pt,metrics.jsonl}`                       |
-| Evaluation   | _Phase 6_                                                                             |                                                                                  |
-| Serving      | _Phase 8_                                                                             |                                                                                  |
+| Stage        | Command                                                                              | Output                                                                           |
+| ------------ | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| Corpus build | `amnmt data build -c configs/full.yaml [--root DIR] [--raw-dir DIR]`                 | `data/processed/full/{train,train_holdout,valid,test}.parquet`, `data_card.json` |
+| Tokenizer    | `amnmt tokenizer train -c configs/full.yaml [--root DIR]`                            | `artifacts/full/tokenizer/{tokenizer.json,stats.json}`                           |
+| Training     | `amnmt train -c configs/full.yaml [--root DIR] --run NAME --resume --time-limit MIN` | `artifacts/full/runs/NAME/{last.pt,best.pt,metrics.jsonl}`                       |
+| Evaluation   | _Phase 6_                                                                            |                                                                                  |
+| Serving      | _Phase 8_                                                                            |                                                                                  |
 
 `configs/tiny.yaml` runs the same pipeline on a few thousand pairs and must always work.
 

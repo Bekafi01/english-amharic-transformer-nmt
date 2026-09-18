@@ -101,12 +101,15 @@ class Trainer:
         self.criterion = LabelSmoothedCrossEntropy(self.tok.pad_id, t.label_smoothing)
 
         use_amp = t.amp and self.device.type == "cuda"
-        self.amp_dtype = (
-            torch.bfloat16 if use_amp and torch.cuda.is_bf16_supported() else torch.float16
-        )
+        # Native bf16 needs Ampere (sm_80+). is_bf16_supported() also says True for *emulated*
+        # bf16 on Turing (T4), which is several times slower than fp16 there.
+        native_bf16 = use_amp and torch.cuda.get_device_capability(self.device) >= (8, 0)
+        self.amp_dtype = torch.bfloat16 if native_bf16 else torch.float16
         self.use_amp = use_amp
         self.scaler = torch.amp.GradScaler(enabled=use_amp and self.amp_dtype == torch.float16)
         self.state = TrainState()
+        if self.device.type == "cuda":
+            log.info("gpu %s (sm_%d%d)", torch.cuda.get_device_name(self.device), *torch.cuda.get_device_capability(self.device))  # fmt: skip
         log.info(
             "device=%s amp=%s params=%s train_pairs=%s samples=%s batches/epoch=%s",
             self.device,
