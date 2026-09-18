@@ -143,5 +143,41 @@ def translate(
         print(out)
 
 
+@app.command("eval")
+def evaluate(
+    checkpoint: Annotated[Path, typer.Option("--checkpoint", "-m", help="best.pt / last.pt")],
+    config: ConfigOpt,
+    root: RootOpt = None,
+    split: Annotated[
+        str, typer.Option(help="test (FLORES devtest) or valid (FLORES dev)")
+    ] = "test",
+    beam: int = 4,
+    length_penalty: float = 1.0,
+    spbleu: Annotated[bool, typer.Option(help="Also compute spBLEU (downloads SPM once).")] = False,
+    limit: Annotated[int | None, typer.Option(help="Only the first N sentences (smoke).")] = None,
+    tokenizer: Path | None = None,
+) -> None:
+    """Score a checkpoint on FLORES-200 in both directions (Phase 6). Writes JSON + Markdown
+    next to the checkpoint."""
+    from amnmt.evaluation.flores import run_and_save
+
+    cfg = _load(config, root, None)
+    if split not in ("test", "valid"):
+        raise typer.BadParameter("split must be test or valid")
+    results = run_and_save(
+        checkpoint,
+        cfg.paths.resolve("data_processed") / f"{split}.parquet",
+        checkpoint.parent,
+        tokenizer,
+        beam_size=beam,
+        length_penalty=length_penalty,
+        spbleu=spbleu,
+        limit=limit,
+    )
+    rprint(
+        json.dumps({d: r["vs_normalized_ref"] for d, r in results["directions"].items()}, indent=2)
+    )
+
+
 if __name__ == "__main__":
     app()
