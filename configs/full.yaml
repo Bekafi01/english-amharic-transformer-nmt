@@ -48,7 +48,7 @@ tokenizer:
     min_score:
       nllb: 1.068
 
-model:  # Transformer-base
+model: # Transformer-base
   d_model: 512
   n_heads: 8
   d_ff: 2048
@@ -56,3 +56,21 @@ model:  # Transformer-base
   n_decoder_layers: 6
   dropout: 0.1
   max_len: 256
+training:
+  # `medium` subset (D12): all curated sources + NLLB above the p75 LASER score (~4.4M pairs).
+  subset:
+    min_score:
+      nllb: 1.068
+  directions: [en-am, am-en]
+  max_len: 128
+  batch_tokens: 8000 # T4 16 GB with fp16; raise to 12000 on an A100
+  accumulation_steps: 3 # effective ~24k tokens/step
+  peak_lr: 7.0e-4
+  warmup_steps: 4000
+  label_smoothing: 0.1
+  max_steps: 100000
+  log_every: 100
+  eval_every: 2000
+  save_every: 2000
+  n_samples: 4
+  num_workers: 2

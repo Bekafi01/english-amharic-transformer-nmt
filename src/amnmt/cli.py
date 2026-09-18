@@ -6,6 +6,7 @@ Each phase registers its own sub-app here (`data`, `tokenizer`, `train`, `transl
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated
 
@@ -82,6 +83,35 @@ def tokenizer_train(config: ConfigOpt, root: RootOpt = None) -> None:
 
     stats = train(_load(config, root, None))
     rprint(json.dumps(stats, indent=2))
+
+
+@app.command()
+def train(
+    config: ConfigOpt,
+    root: RootOpt = None,
+    run: Annotated[str | None, typer.Option(help="Run name (default: project name).")] = None,
+    resume: Annotated[bool, typer.Option(help="Continue from <run>/last.pt if present.")] = False,
+    max_steps: Annotated[int | None, typer.Option(help="Override training.max_steps.")] = None,
+    time_limit: Annotated[
+        int | None, typer.Option(help="Override training.time_limit_minutes.")
+    ] = None,
+) -> None:
+    """Train the Transformer (Phase 4). Checkpoints go to <artifacts>/runs/<run>/."""
+    from amnmt.training.trainer import Trainer
+
+    cfg = _load(config, root, None)
+    if cfg.training is None:
+        raise typer.BadParameter("config has no `training` section")
+    overrides: dict[str, int] = {}
+    if max_steps is not None:
+        overrides["max_steps"] = max_steps
+    if time_limit is not None:
+        overrides["time_limit_minutes"] = time_limit
+    if overrides:
+        cfg = cfg.model_copy(update={"training": cfg.training.model_copy(update=overrides)})
+    run_dir = cfg.paths.resolve("artifacts") / "runs" / (run or cfg.project.name)
+    state = Trainer(cfg, run_dir).train(resume=resume)
+    rprint(json.dumps(asdict(state), indent=2))
 
 
 if __name__ == "__main__":

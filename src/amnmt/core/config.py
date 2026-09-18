@@ -173,12 +173,51 @@ class ModelConfig(_Strict):
         return self
 
 
+# ------------------------------------------------------------------ Phase 4: training
+
+
+class TrainingConfig(_Strict):
+    # --- data
+    subset: SubsetConfig = Field(default_factory=SubsetConfig)
+    max_pairs: int | None = None  # deterministic cap after the subset filter
+    directions: list[Literal["en-am", "am-en"]] = ["en-am", "am-en"]
+    max_len: int = 128  # tokens per side incl. tag/bos/eos; longer pairs are dropped
+    batch_tokens: int = 8000  # padded tokens per batch (max over src/tgt side)
+    accumulation_steps: int = 1
+    num_workers: int = 2
+    # --- optimisation
+    peak_lr: float = 7e-4
+    warmup_steps: int = 4000
+    adam_betas: tuple[float, float] = (0.9, 0.98)
+    adam_eps: float = 1e-9
+    weight_decay: float = 0.0
+    label_smoothing: float = 0.1
+    grad_clip: float = 1.0
+    amp: bool = True  # bf16 if supported, else fp16 + GradScaler; ignored on CPU
+    # --- schedule
+    max_steps: int = 100_000
+    log_every: int = 100
+    eval_every: int = 2000
+    save_every: int = 2000
+    n_samples: int = 4  # holdout sentences greedy-decoded at each eval for the log
+    time_limit_minutes: int | None = None  # stop and checkpoint cleanly before Colab does it for us
+
+    @model_validator(mode="after")
+    def _positive(self) -> TrainingConfig:
+        if not self.directions:
+            raise ValueError("directions must not be empty")
+        if self.save_every % self.eval_every and self.eval_every % self.save_every:
+            raise ValueError("save_every and eval_every should be multiples of each other")
+        return self
+
+
 class Config(_Strict):
     project: ProjectConfig
     paths: PathsConfig = Field(default_factory=PathsConfig)
     data: DataConfig | None = None
     tokenizer: TokenizerConfig | None = None
     model: ModelConfig | None = None
+    training: TrainingConfig | None = None
 
     def with_paths(self, **overrides: Path) -> Config:
         return self.model_copy(update={"paths": self.paths.model_copy(update=overrides)})
