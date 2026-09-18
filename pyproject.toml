@@ -52,6 +52,7 @@ packages = ["src/amnmt"]
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
 markers = ["slow: takes more than a few seconds; skipped in the default CI run"]
+filterwarnings = ["ignore:enable_nested_tensor is True:UserWarning"]
 
 [tool.ruff]
 line-length = 100
@@ -62,7 +63,8 @@ extend-exclude = ["notebooks"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "N", "SIM", "RUF"]
 # RUF001-003 flag "confusable" unicode; Ethiopic text is the point of this project.
-ignore = ["RUF001", "RUF002", "RUF003", "RUF012"]
+# N812: `import torch.nn.functional as F` is the universal torch idiom.
+ignore = ["RUF001", "RUF002", "RUF003", "RUF012", "N812"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["amnmt"]
@@ -73,6 +75,11 @@ packages = ["amnmt"]
 mypy_path = "src"
 strict = true
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# nn.Module.__call__ is typed as Any; every forward() would need a cast otherwise.
+module = ["amnmt.model.*", "amnmt.training.*", "amnmt.inference.*"]
+warn_return_any = false
 
 # --------------------------------------------------------------------------------------
 # Architecture contracts (enforced by `lint-imports`). See PLAN.md "Package layout".
@@ -108,3 +115,5 @@ name = "model is pure torch: no I/O, no config files, no data layer"
 type = "forbidden"
 source_modules = ["amnmt.model"]
 forbidden_modules = ["yaml", "pyarrow", "duckdb", "datasets", "tokenizers", "amnmt.data", "amnmt.tokenization"]
+# model imports the ModelConfig *type* from core, which itself imports yaml; that is fine.
+allow_indirect_imports = "True"

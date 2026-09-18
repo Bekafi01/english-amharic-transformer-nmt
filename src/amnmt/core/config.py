@@ -151,11 +151,34 @@ class TokenizerConfig(_Strict):
     subset: SubsetConfig = Field(default_factory=SubsetConfig)
 
 
+# ------------------------------------------------------------------ Phase 3: model
+
+
+class ModelConfig(_Strict):
+    """Pre-LN encoder-decoder Transformer. Vocab size and pad id come from the tokenizer."""
+
+    d_model: int = 512
+    n_heads: int = 8
+    d_ff: int = 2048
+    n_encoder_layers: int = 6
+    n_decoder_layers: int = 6
+    dropout: float = 0.1
+    max_len: int = 256  # positional table size; also the hard cap on sequence length
+    activation: Literal["relu", "gelu"] = "relu"
+
+    @model_validator(mode="after")
+    def _heads_divide(self) -> ModelConfig:
+        if self.d_model % self.n_heads:
+            raise ValueError(f"d_model={self.d_model} not divisible by n_heads={self.n_heads}")
+        return self
+
+
 class Config(_Strict):
     project: ProjectConfig
     paths: PathsConfig = Field(default_factory=PathsConfig)
     data: DataConfig | None = None
     tokenizer: TokenizerConfig | None = None
+    model: ModelConfig | None = None
 
     def with_paths(self, **overrides: Path) -> Config:
         return self.model_copy(update={"paths": self.paths.model_copy(update=overrides)})
