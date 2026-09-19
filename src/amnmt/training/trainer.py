@@ -246,8 +246,12 @@ class Trainer:
             log.info("no checkpoint at %s; starting fresh", last)
         t = self.tcfg
         self.model.train()
-        t_start = time.perf_counter() - self.state.elapsed_seconds
-        deadline = None if t.time_limit_minutes is None else t_start + 60 * t.time_limit_minutes
+        # elapsed_seconds is cumulative across sessions; the time limit is per session.
+        session_start = time.perf_counter()
+        t_start = session_start - self.state.elapsed_seconds
+        deadline = (
+            None if t.time_limit_minutes is None else session_start + 60 * t.time_limit_minutes
+        )
         window_loss = window_tok = 0.0
         window_t0 = time.perf_counter()
         micro = 0
