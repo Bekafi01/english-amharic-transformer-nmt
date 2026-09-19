@@ -145,7 +145,8 @@ def test_resume_reproduces_uninterrupted_run(workspace: Path) -> None:
     ):
         assert n1 == n2 and torch.allclose(p1, p2, atol=1e-6), n1
     steps = [
-        json.loads(line)["step"] for line in (part_dir / "metrics.jsonl").read_text().splitlines()
+        json.loads(line)["step"]
+        for line in (part_dir / "metrics.jsonl").read_text(encoding="utf-8").splitlines()
     ]
     assert steps == sorted(steps) and 24 in steps
 
