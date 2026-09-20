@@ -61,6 +61,23 @@ word split, isolated punctuation, individual digits, byte fallback (no `<unk>` e
 `<pad>=0 <s>=1 </s>=2 <unk>=3 <2am>=4 <2en>=5`. Trained on a seeded reservoir sample of the
 score-filtered training subset.
 
+## Results
+
+`configs/full.yaml` — Transformer-base (60.5M params, 6+6 layers, d=512, tied 32k BPE), one
+bidirectional model trained on the *medium* subset (4.43M pairs: all curated sources + NLLB pairs
+with LASER score ≥ 1.068) for 44k steps ≈ 12 GPU-hours on a Colab T4 (fp16, 8k tokens × 3
+accumulation). Scores on **FLORES-200 devtest** (1,012 sentences), beam 4, sacreBLEU 2.6:
+
+| direction | BLEU  | chrF++ | spBLEU |
+| --------- | ----- | ------ | ------ |
+| en → am   | 14.06 | 36.97  | 27.40  |
+| am → en   | 24.02 | 48.90  | 24.62  |
+
+BLEU is `13a`-tokenized; spBLEU uses the `flores200` SentencePiece tokenizer. Hypotheses are
+scored against references normalized the same way as the training data (homophone folding etc.);
+against the raw references en→am BLEU is 11.80. Still improving slowly at 44k — numbers will be
+updated as training continues.
+
 ## Layout
 
 ```
