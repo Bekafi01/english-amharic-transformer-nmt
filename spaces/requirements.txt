@@ -1,0 +1,4 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.3
+git+https://github.com/Bekafi01/english-amharic-transformer-nmt.git@v1.1.0#egg=amnmt[tokenization,hub]
+streamlit>=1.35

@@ -174,7 +174,7 @@ wheels = [
 
 [[package]]
 name = "amnmt"
-version = "1.0.0"
+version = "1.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "pydantic" },
@@ -189,6 +189,7 @@ all = [
     { name = "datasets" },
     { name = "duckdb" },
     { name = "fastapi" },
+    { name = "huggingface-hub" },
     { name = "pyarrow" },
     { name = "sacrebleu" },
     { name = "streamlit" },
@@ -202,6 +203,9 @@ data = [
 ]
 evaluation = [
     { name = "sacrebleu" },
+]
+hub = [
+    { name = "huggingface-hub" },
 ]
 serving = [
     { name = "fastapi" },
@@ -225,10 +229,11 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "amnmt", extras = ["data", "tokenization", "evaluation", "serving"], marker = "extra == 'all'" },
+    { name = "amnmt", extras = ["data", "tokenization", "evaluation", "serving", "hub"], marker = "extra == 'all'" },
     { name = "datasets", marker = "extra == 'data'", specifier = ">=2.19" },
     { name = "duckdb", marker = "extra == 'data'", specifier = ">=1.0" },
     { name = "fastapi", marker = "extra == 'serving'", specifier = ">=0.111" },
+    { name = "huggingface-hub", marker = "extra == 'hub'", specifier = ">=0.23" },
     { name = "pyarrow", marker = "extra == 'data'", specifier = ">=15.0" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pyyaml", specifier = ">=6.0" },
@@ -240,7 +245,7 @@ requires-dist = [
     { name = "typer", specifier = ">=0.12" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'serving'", specifier = ">=0.29" },
 ]
-provides-extras = ["data", "tokenization", "evaluation", "serving", "all"]
+provides-extras = ["data", "tokenization", "evaluation", "serving", "hub", "all"]
 
 [package.metadata.requires-dev]
 dev = [

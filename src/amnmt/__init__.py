@@ -3,4 +3,4 @@
 Layered package; see PLAN.md for the layer rules enforced by import-linter.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"

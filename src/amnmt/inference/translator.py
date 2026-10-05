@@ -22,8 +22,27 @@ _LANGS: dict[str, tuple[str, str]] = {"en-am": ("en", "am"), "am-en": ("am", "en
 
 
 def default_tokenizer_path(checkpoint: Path) -> Path:
-    """<artifacts>/runs/<run>/<ckpt>.pt -> <artifacts>/tokenizer/tokenizer.json"""
-    return checkpoint.resolve().parent.parent.parent / "tokenizer" / "tokenizer.json"
+    """Exported bundle: tokenizer.json beside model.pt.
+    Trainer run: <artifacts>/runs/<run>/<ckpt>.pt -> <artifacts>/tokenizer/tokenizer.json"""
+    checkpoint = checkpoint.resolve()
+    beside = checkpoint.parent / "tokenizer.json"
+    if beside.exists():
+        return beside
+    return checkpoint.parent.parent.parent / "tokenizer" / "tokenizer.json"
+
+
+def resolve_checkpoint(checkpoint: str | Path) -> Path:
+    """Local path, or `hf://<repo_id>[@<revision>]` → downloads model.pt + tokenizer.json."""
+    spec = str(checkpoint)
+    if not spec.startswith("hf://"):
+        return Path(checkpoint)
+    from huggingface_hub import hf_hub_download
+
+    repo, _, revision = spec.removeprefix("hf://").partition("@")
+    rev = revision or None
+    model_path: str = hf_hub_download(repo_id=repo, filename="model.pt", revision=rev)
+    hf_hub_download(repo_id=repo, filename="tokenizer.json", revision=rev)  # cached beside model.pt
+    return Path(model_path)
 
 
 class Translator:
@@ -49,14 +68,14 @@ class Translator:
         tokenizer: str | Path | None = None,
         device: str | torch.device | None = None,
     ) -> Translator:
-        ckpt_path = Path(checkpoint)
+        ckpt_path = resolve_checkpoint(checkpoint)
         dev = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
-        ckpt = torch.load(ckpt_path, map_location=dev, weights_only=False)
+        ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
         cfg = ckpt["config"]
         model = Seq2SeqTransformer(
             ModelConfig.model_validate(cfg["model"]), ckpt["vocab_size"], ckpt["pad_id"]
         )
-        model.load_state_dict(ckpt["model"])
+        model.load_state_dict(ckpt["model"])  # fp16 exports are upcast into the fp32 module
         tok = Tokenizer.from_file(tokenizer or default_tokenizer_path(ckpt_path))
         norm = (cfg.get("data") or {}).get("normalize") or {}
         return cls(

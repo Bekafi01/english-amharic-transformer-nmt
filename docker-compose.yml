@@ -1,14 +1,15 @@
 # docker compose up --build
-# Expects ./artifacts/full/{runs/base_medium/best.pt, tokenizer/tokenizer.json} on the host
-# (copy them from Drive). API on :8000 (docs at /docs), UI on :8501.
+# By default pulls the published fp16 weights from the Hub (no local files needed).
+# To serve a local checkpoint: AMNMT_CHECKPOINT=/models/runs/<run>/best.pt docker compose up
+# (./artifacts/full is mounted at /models). API on :8000 (docs at /docs), UI on :8501.
 services:
   api:
     build: .
     image: amnmt
     ports: ["8000:8000"]
-    volumes: ["./artifacts/full:/models:ro"]
+    volumes: ["./artifacts/full:/models:ro", "hf-cache:/home/amnmt/.cache/huggingface"]
     environment:
-      AMNMT_CHECKPOINT: /models/runs/base_medium/best.pt
+      AMNMT_CHECKPOINT: ${AMNMT_CHECKPOINT:-hf://Bekafi01/amnmt-en-am-base}
       AMNMT_DEVICE: cpu
     restart: unless-stopped
 
@@ -16,9 +17,9 @@ services:
     image: amnmt
     depends_on: [api]
     ports: ["8501:8501"]
-    volumes: ["./artifacts/full:/models:ro"]
+    volumes: ["./artifacts/full:/models:ro", "hf-cache:/home/amnmt/.cache/huggingface"]
     environment:
-      AMNMT_CHECKPOINT: /models/runs/base_medium/best.pt
+      AMNMT_CHECKPOINT: ${AMNMT_CHECKPOINT:-hf://Bekafi01/amnmt-en-am-base}
       AMNMT_DEVICE: cpu
     command:
       [
@@ -32,3 +33,6 @@ services:
         "--server.headless",
         "true",
       ]
+
+volumes:
+  hf-cache:

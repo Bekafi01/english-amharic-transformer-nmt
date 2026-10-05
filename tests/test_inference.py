@@ -144,3 +144,72 @@ def test_translator_normalizes_input_before_encoding(checkpoint: Path) -> None:
     assert torch.equal(tr.encode_source([raw], "am-en"), tr.encode_source([folded], "am-en"))
     src = tr.encode_source(["Hello world"], "en-am")[0].tolist()
     assert src[0] == tr.tok.lang_id("am") and src[-1] == tr.tok.eos_id
+
+
+# ----------------------------------------------------------------------------- export / hub
+
+
+def test_export_bundle_is_small_and_equivalent(checkpoint: Path, tmp_path: Path) -> None:
+    import json
+
+    import torch
+
+    from amnmt.inference.export import export_checkpoint
+
+    info = export_checkpoint(checkpoint, tmp_path / "bundle", fp16=True)
+    bundle = tmp_path / "bundle"
+    assert (bundle / "model.pt").exists() and (bundle / "tokenizer.json").exists()
+    assert json.loads((bundle / "export.json").read_text())["dtype"] == "float16"
+    assert info["step"] == 12 and info["model_mb"] < (checkpoint.stat().st_size / 1e6) / 2
+
+    raw = torch.load(bundle / "model.pt", map_location="cpu", weights_only=False)
+    assert set(raw) == {"model", "config", "vocab_size", "pad_id", "export"}
+    assert "optimizer" not in raw and "training" not in raw["config"]
+    assert all(v.dtype == torch.float16 for v in raw["model"].values() if v.is_floating_point())
+
+    # tokenizer.json beside model.pt is picked up automatically; outputs match the trainer ckpt
+    full = Translator.from_checkpoint(checkpoint, device="cpu")
+    slim = Translator.from_checkpoint(bundle / "model.pt", device="cpu")
+    assert default_tokenizer_path(bundle / "model.pt") == bundle / "tokenizer.json"
+    assert slim.translate(EN[:3], "en-am", beam_size=2) == full.translate(
+        EN[:3], "en-am", beam_size=2
+    )
+
+
+def test_export_fp32_keeps_dtype(checkpoint: Path, tmp_path: Path) -> None:
+    import torch
+
+    from amnmt.inference.export import export_checkpoint
+
+    export_checkpoint(checkpoint, tmp_path / "b32", fp16=False)
+    raw = torch.load(tmp_path / "b32" / "model.pt", map_location="cpu", weights_only=False)
+    assert all(v.dtype == torch.float32 for v in raw["model"].values() if v.is_floating_point())
+
+
+def test_hf_prefix_resolves_via_hub_download(
+    checkpoint: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import sys
+    import types
+
+    from amnmt.inference.export import export_checkpoint
+    from amnmt.inference.translator import resolve_checkpoint
+
+    export_checkpoint(checkpoint, tmp_path / "hub")
+    calls: list[dict[str, object]] = []
+
+    def fake_download(filename: str, repo_id: str, revision: str | None) -> str:
+        calls.append({"filename": filename, "repo_id": repo_id, "revision": revision})
+        return str(tmp_path / "hub" / filename)
+
+    monkeypatch.setitem(
+        sys.modules, "huggingface_hub", types.SimpleNamespace(hf_hub_download=fake_download)
+    )
+    assert resolve_checkpoint("hf://user/model") == tmp_path / "hub" / "model.pt"
+    assert [c["filename"] for c in calls] == ["model.pt", "tokenizer.json"]
+    assert calls[0]["repo_id"] == "user/model" and calls[0]["revision"] is None
+    resolve_checkpoint("hf://user/model@v2")
+    assert calls[-1]["revision"] == "v2"
+    assert resolve_checkpoint(checkpoint) == checkpoint  # plain paths untouched
+    tr = Translator.from_checkpoint("hf://user/model", device="cpu")
+    assert tr.translate([EN[0]], "en-am", beam_size=1)

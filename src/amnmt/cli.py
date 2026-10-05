@@ -200,5 +200,18 @@ def serve(
     uvicorn.run("amnmt.serving.app:app", host=host, port=port)
 
 
+@app.command()
+def export(
+    checkpoint: Annotated[Path, typer.Option("--checkpoint", "-m", help="Trainer best.pt")],
+    out_dir: Annotated[Path, typer.Option("--out", "-o", help="Bundle directory to create.")],
+    tokenizer: Path | None = None,
+    fp16: Annotated[bool, typer.Option(help="Store weights in float16 (~6x smaller).")] = True,
+) -> None:
+    """Write an inference-only bundle (model.pt + tokenizer.json) ready for the HF Hub."""
+    from amnmt.inference.export import export_checkpoint
+
+    rprint(json.dumps(export_checkpoint(checkpoint, out_dir, tokenizer, fp16=fp16), indent=2))
+
+
 if __name__ == "__main__":
     app()
