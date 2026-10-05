@@ -3,9 +3,8 @@ title: English ↔ Amharic Translation
 emoji: 🇪🇹
 colorFrom: green
 colorTo: yellow
-sdk: streamlit
-sdk_version: "1.39.0"
-app_file: app.py
+sdk: docker
+app_port: 7860
 pinned: false
 license: mit
 short_description: From-scratch 60M Transformer, en↔am, trained on a Colab T4
