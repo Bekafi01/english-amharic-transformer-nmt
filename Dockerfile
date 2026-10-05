@@ -22,7 +22,7 @@ COPY src ./src
 COPY app.py ./
 RUN pip install --no-deps -e . && useradd --create-home --uid 1000 amnmt && chown -R amnmt /app
 USER amnmt
-ENV AMNMT_DEVICE=cpu AMNMT_CHECKPOINT=hf://Bekafi01/amnmt-en-am-base
+ENV AMNMT_DEVICE=cpu AMNMT_CHECKPOINT=hf://Bekafi/amnmt-en-am-base
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s \
     CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health').status==200 else 1)"

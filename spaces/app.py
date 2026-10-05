@@ -12,7 +12,7 @@ import streamlit as st
 
 from amnmt.inference.translator import Translator
 
-MODEL_ID = os.environ.get("AMNMT_MODEL_ID", "Bekafi01/amnmt-en-am-base")
+MODEL_ID = os.environ.get("AMNMT_MODEL_ID", "Bekafi/amnmt-en-am-base")
 _ETHIOPIC = re.compile(r"[\u1200-\u137f]")
 
 EXAMPLES = {

@@ -7,9 +7,10 @@ services:
     build: .
     image: amnmt
     ports: ["8000:8000"]
-    volumes: ["./artifacts/full:/models:ro", "hf-cache:/home/amnmt/.cache/huggingface"]
+    volumes:
+      ["./artifacts/full:/models:ro", "hf-cache:/home/amnmt/.cache/huggingface"]
     environment:
-      AMNMT_CHECKPOINT: ${AMNMT_CHECKPOINT:-hf://Bekafi01/amnmt-en-am-base}
+      AMNMT_CHECKPOINT: ${AMNMT_CHECKPOINT:-hf://Bekafi/amnmt-en-am-base}
       AMNMT_DEVICE: cpu
     restart: unless-stopped
 
@@ -17,9 +18,10 @@ services:
     image: amnmt
     depends_on: [api]
     ports: ["8501:8501"]
-    volumes: ["./artifacts/full:/models:ro", "hf-cache:/home/amnmt/.cache/huggingface"]
+    volumes:
+      ["./artifacts/full:/models:ro", "hf-cache:/home/amnmt/.cache/huggingface"]
     environment:
-      AMNMT_CHECKPOINT: ${AMNMT_CHECKPOINT:-hf://Bekafi01/amnmt-en-am-base}
+      AMNMT_CHECKPOINT: ${AMNMT_CHECKPOINT:-hf://Bekafi/amnmt-en-am-base}
       AMNMT_DEVICE: cpu
     command:
       [

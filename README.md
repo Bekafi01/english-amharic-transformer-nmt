@@ -39,32 +39,32 @@ make check      # ruff + import-linter + mypy + pytest
 
 ## Pipeline
 
-| Stage        | Command                                                                               | Output                                                                           |
-| ------------ | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Corpus build | `amnmt data build -c configs/full.yaml [--root DIR] [--raw-dir DIR]`                  | `data/processed/full/{train,train_holdout,valid,test}.parquet`, `data_card.json` |
-| Tokenizer    | `amnmt tokenizer train -c configs/full.yaml [--root DIR]`                             | `artifacts/full/tokenizer/{tokenizer.json,stats.json}`                           |
-| Training     | `amnmt train -c configs/full.yaml [--root DIR] --run NAME --resume --time-limit MIN`  | `artifacts/full/runs/NAME/{last.pt,best.pt,metrics.jsonl}`                       |
-| Translate    | `amnmt translate -m best.pt -d en-am "text" [--beam 4]`                               | stdout                                                                           |
-| Evaluation   | `amnmt eval -m best.pt -c configs/full.yaml [--root DIR] --split test [--spbleu]`     | `runs/NAME/eval_test_beam4.{json,md}` (BLEU, chrF++, spBLEU, both directions)    |
+| Stage        | Command                                                                               | Output                                                                              |
+| ------------ | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Corpus build | `amnmt data build -c configs/full.yaml [--root DIR] [--raw-dir DIR]`                  | `data/processed/full/{train,train_holdout,valid,test}.parquet`, `data_card.json`    |
+| Tokenizer    | `amnmt tokenizer train -c configs/full.yaml [--root DIR]`                             | `artifacts/full/tokenizer/{tokenizer.json,stats.json}`                              |
+| Training     | `amnmt train -c configs/full.yaml [--root DIR] --run NAME --resume --time-limit MIN`  | `artifacts/full/runs/NAME/{last.pt,best.pt,metrics.jsonl}`                          |
+| Translate    | `amnmt translate -m best.pt -d en-am "text" [--beam 4]`                               | stdout                                                                              |
+| Evaluation   | `amnmt eval -m best.pt -c configs/full.yaml [--root DIR] --split test [--spbleu]`     | `runs/NAME/eval_test_beam4.{json,md}` (BLEU, chrF++, spBLEU, both directions)       |
 | Export       | `amnmt export -m best.pt -o bundle/ [--fp16]`                                         | `bundle/{model.pt,tokenizer.json,export.json}` — inference-only, ~120 MB, Hub-ready |
-| Serving      | `amnmt serve -m best.pt [--port 8000]` · `streamlit run app.py` · `docker compose up` | REST `POST /translate`, `GET /health`, OpenAPI at `/docs`; Streamlit UI on :8501 |
+| Serving      | `amnmt serve -m best.pt [--port 8000]` · `streamlit run app.py` · `docker compose up` | REST `POST /translate`, `GET /health`, OpenAPI at `/docs`; Streamlit UI on :8501    |
 
 `configs/tiny.yaml` runs the same pipeline on a few thousand pairs and must always work.
 
 ### Try the trained model
 
-Live demo: [huggingface.co/spaces/Bekafi01/amnmt](https://huggingface.co/spaces/Bekafi01/amnmt) ·
-Weights: [Bekafi01/amnmt-en-am-base](https://huggingface.co/Bekafi01/amnmt-en-am-base) (CC-BY-NC-4.0).
+Live demo: [huggingface.co/spaces/Bekafi/amnmt](https://huggingface.co/spaces/Bekafi/amnmt) ·
+Weights: [Bekafi/amnmt-en-am-base](https://huggingface.co/Bekafi/amnmt-en-am-base) (CC-BY-NC-4.0).
 
 ```bash
 pip install "amnmt[tokenization,hub] @ git+https://github.com/Bekafi01/english-amharic-transformer-nmt.git"
-amnmt translate -m hf://Bekafi01/amnmt-en-am-base -d en-am "Coffee originated in Ethiopia."
+amnmt translate -m hf://Bekafi/amnmt-en-am-base -d en-am "Coffee originated in Ethiopia."
 ```
 
 ```python
 from amnmt.inference.translator import Translator
 
-tr = Translator.from_checkpoint("hf://Bekafi01/amnmt-en-am-base")
+tr = Translator.from_checkpoint("hf://Bekafi/amnmt-en-am-base")
 tr.translate(["The children are playing in the garden."], "en-am")
 ```
 
@@ -152,7 +152,7 @@ Training curve (FLORES dev perplexity): 176 @ 2k steps → 14.4 @ 8k → 8.9 @ 2
 | am→en | Chelsy Cross የእኋን ግሩም ፍቃደኛ ሰራተኞች አንዱ ነው! | Chelsy Cross is one of our excellent volunteers! |
 
 The trained checkpoint (`best.pt`, 700 MB) is not in the repository; the fp16 inference export
-(~120 MB) is on the Hub at [Bekafi01/amnmt-en-am-base](https://huggingface.co/Bekafi01/amnmt-en-am-base).
+(~120 MB) is on the Hub at [Bekafi/amnmt-en-am-base](https://huggingface.co/Bekafi/amnmt-en-am-base).
 
 ## Design
 
