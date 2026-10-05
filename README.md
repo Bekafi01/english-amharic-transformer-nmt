@@ -53,7 +53,8 @@ make check      # ruff + import-linter + mypy + pytest
 
 ### Try the trained model
 
-Live demo: [huggingface.co/spaces/Bekafi/amnmt](https://huggingface.co/spaces/Bekafi/amnmt) ·
+Live demo: [amnmt.streamlit.app](https://amnmt.streamlit.app) (Streamlit Community Cloud, free tier —
+may take a minute to wake) ·
 Weights: [Bekafi/amnmt-en-am-base](https://huggingface.co/Bekafi/amnmt-en-am-base) (CC-BY-NC-4.0).
 
 ```bash
@@ -69,8 +70,8 @@ tr.translate(["The children are playing in the garden."], "en-am")
 ```
 
 Any `-m` / `AMNMT_CHECKPOINT` that accepts a path also accepts `hf://<repo>[@<revision>]`, so the
-REST API and Docker image can run straight from the Hub. The `spaces/` folder holds the Space app
-and the model card.
+REST API and Docker image can run straight from the Hub. The `demo/` folder holds the hosted demo
+app (deployed from this repo by Streamlit Community Cloud) and the model card.
 
 ### Reproducing the full model on Colab / Kaggle
 

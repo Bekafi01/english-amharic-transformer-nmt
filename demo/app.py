@@ -1,5 +1,5 @@
-"""Hugging Face Space: Streamlit UI over the published model. Weights come from the Hub model repo
-(MODEL_ID) on first start and are cached by the Space afterwards.
+"""Hosted demo (Streamlit Community Cloud): Streamlit UI over the published model. Weights come
+from the Hub model repo (MODEL_ID) on each cold start; the container disk is ephemeral.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ EXAMPLES = {
 st.set_page_config(page_title="English ↔ Amharic", page_icon="🇪🇹", layout="centered")
 
 
-@st.cache_resource(show_spinner="Downloading model (first start only)…")
+@st.cache_resource(show_spinner="Loading model (~120 MB, once per server start)…")
 def load() -> Translator:
     return Translator.from_checkpoint(f"hf://{MODEL_ID}", device="cpu")
 
