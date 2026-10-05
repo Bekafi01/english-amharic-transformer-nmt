@@ -1,8 +1,33 @@
 # English ↔ Amharic Transformer NMT
 
+[![CI](https://github.com/Bekafi01/english-amharic-transformer-nmt/actions/workflows/ci.yml/badge.svg)](https://github.com/Bekafi01/english-amharic-transformer-nmt/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![PyTorch 2.3+](https://img.shields.io/badge/PyTorch-2.3+-ee4c2c.svg)](https://pytorch.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A from-scratch PyTorch Transformer for bidirectional English–Amharic translation, built as a
-layered Python package with one CLI. Heavy stages (corpus build, training) run on Colab/Kaggle;
-everything is reproducible from the YAML configs in `configs/`.
+layered Python package with one CLI. One 60M-parameter model handles both directions via a
+target-language tag; it was trained on 4.4M filtered sentence pairs in 15 GPU-hours on a free
+Colab T4 and reaches **14.5 BLEU / 37.7 chrF++ (en→am)** and **24.4 BLEU / 49.3 chrF++ (am→en)**
+on FLORES-200 devtest. Heavy stages (corpus build, training) run on Colab/Kaggle; everything is
+reproducible from the YAML configs in `configs/`.
+
+```mermaid
+flowchart LR
+    subgraph Data["amnmt.data"]
+        SRC["OPUS · HF datasets<br/>16M raw pairs"] --> NORM["Ethiopic normalizer<br/>+ quality filters"]
+        NORM --> DEDUP["DuckDB dedup<br/>FLORES exclusion"]
+        DEDUP --> PQ[("train / valid / test<br/>parquet")]
+    end
+    PQ --> TOK["amnmt.tokenization<br/>joint 32k BPE, byte fallback"]
+    TOK --> CACHE[("uint16 token cache")]
+    CACHE --> TRAIN["amnmt.training<br/>token-budget batches · AMP<br/>label smoothing · exact resume"]
+    MODEL["amnmt.model<br/>Pre-LN Transformer<br/>tied embeddings · SDPA"] --> TRAIN
+    TRAIN --> CKPT[("best.pt")]
+    CKPT --> INF["amnmt.inference<br/>beam search · Translator"]
+    INF --> EVAL["amnmt.evaluation<br/>FLORES-200 BLEU · chrF++ · spBLEU"]
+    INF --> SERVE["amnmt.serving<br/>FastAPI · Streamlit · Docker"]
+```
 
 ## Setup
 
@@ -94,6 +119,41 @@ against the raw references en→am BLEU is 12.24 — the cost of folding, which 
 should avoid (`normalize.fold_homophones: false`). Greedy decoding is about 1 BLEU lower in each
 direction.
 
+Training curve (FLORES dev perplexity): 176 @ 2k steps → 14.4 @ 8k → 8.9 @ 26k → 8.1 @ 44k →
+7.9 @ 54k (plateau). Sample output of the final model:
+
+|       | input                                    | output                                           |
+| ----- | ---------------------------------------- | ------------------------------------------------ |
+| en→am | The children are playing in the garden.  | ልጆች በአትክልቱ ውስጥ እየተጫወቱ ነው።                        |
+| en→am | Please close the door quietly.           | እባክዎን በሩን በጸጥታ ያጥፍ።                              |
+| am→en | ልጆቹ በአትክልት ስፍራ ውስጥ እየተጫወቱ ነው።            | The kids are playing in the garden.              |
+| am→en | Chelsy Cross የእኋን ግሩም ፍቃደኛ ሰራተኞች አንዱ ነው! | Chelsy Cross is one of our excellent volunteers! |
+
+The trained checkpoint (`best.pt`, 700 MB) and tokenizer are not in the repository; they are
+reproduced by the commands above.
+
+## Design
+
+**Layered package, enforced.** `core ← data ← tokenization ← model ← training ← inference ←
+evaluation ← serving ← cli`. A layer may import only downward; `import-linter` fails CI otherwise.
+The model layer is pure `torch.nn` (no file I/O, no YAML, no tokenizer) and is verified against
+`torch.nn.Transformer` with copied weights to 1e-5.
+
+**Scale ladder.** Every stage runs on `configs/tiny.yaml` in minutes on a CPU (the tests do this)
+before touching `configs/full.yaml`. Same code path; only the numbers change.
+
+**Built for interrupted compute.** Corpus shards, the token cache, and checkpoints live on Drive;
+every stage is idempotent. A resumed training run reproduces an uninterrupted one bit-for-bit
+(tested) — the final model was trained across four Colab sessions.
+
+| decision                                             | why                                                              | measured trade-off                                                        |
+| ---------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| One bidirectional model with `<2am>`/`<2en>` tags    | halves training and serving cost; encoder sees Amharic both ways | —                                                                         |
+| Top-quartile NLLB pairs by LASER score (4.4M of 15M) | 3× shorter epochs; converged in 7                                | train loss flat since 44k → data-saturated at this model size             |
+| Fold Amharic homophones (ሐ/ኀ→ሀ, ሠ→ሰ, ዐ→አ, ፀ→ጸ)       | removes spelling variance the model cannot learn                 | **−2.3 BLEU en→am against raw references**; train unfolded for production |
+| Beam 4, GNMT length penalty, no KV cache             | simple and correct                                               | +1 BLEU over greedy at 3× the decode time                                 |
+| fp16 + GradScaler on T4 (bf16 only on sm_80+)        | T4 "supports" bf16 only by emulation                             | 20k target tok/s, zero overflow events in 15 h                            |
+
 ## Layout
 
 ```
@@ -110,3 +170,17 @@ src/amnmt/
 ```
 
 Layers may only import downward; `import-linter` enforces this in CI.
+
+## Development
+
+```bash
+make check                                    # ruff + import-linter + mypy + pytest (128 tests, ~40 s)
+uv run amnmt data build -c configs/tiny.yaml  # tiny end-to-end on CPU (~1 min, ~70 MB download)
+uv run amnmt tokenizer train -c configs/tiny.yaml
+uv run amnmt train -c configs/tiny.yaml       # 300 steps, ~1 min
+```
+
+## License
+
+MIT — see [LICENSE](LICENSE). Data licenses are listed per source above; the NLLB mined bitext is
+CC-BY-NC-4.0, so a model trained on it inherits the non-commercial restriction.
