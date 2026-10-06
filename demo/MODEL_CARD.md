@@ -49,7 +49,7 @@ model-index:
 A from-scratch PyTorch Transformer for **bidirectional English ↔ Amharic** translation. One
 60.5M-parameter model serves both directions via a target-language tag (`<2am>` / `<2en>`).
 Code: [english-amharic-transformer-nmt](https://github.com/Bekafi01/english-amharic-transformer-nmt) ·
-Demo: [amnmt.streamlit.app](https://amnmt.streamlit.app).
+Demo: [english-amharic-nmt.streamlit.app](https://english-amharic-nmt.streamlit.app).
 
 ## Usage
 

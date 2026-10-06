@@ -53,7 +53,7 @@ make check      # ruff + import-linter + mypy + pytest
 
 ### Try the trained model
 
-Live demo: [amnmt.streamlit.app](https://amnmt.streamlit.app) (Streamlit Community Cloud, free tier —
+Live demo: [english-amharic-nmt.streamlit.app](https://english-amharic-nmt.streamlit.app) (Streamlit Community Cloud, free tier —
 may take a minute to wake) ·
 Weights: [Bekafi/amnmt-en-am-base](https://huggingface.co/Bekafi/amnmt-en-am-base) (CC-BY-NC-4.0).
 

@@ -186,6 +186,28 @@ def test_export_fp32_keeps_dtype(checkpoint: Path, tmp_path: Path) -> None:
     assert all(v.dtype == torch.float32 for v in raw["model"].values() if v.is_floating_point())
 
 
+def test_tokenizer_found_beside_symlinked_model(checkpoint: Path, tmp_path: Path) -> None:
+    """HF cache layout: snapshots/<rev>/model.pt is a symlink into blobs/; tokenizer.json sits
+    beside the link. resolve() would follow the link into blobs/ and miss it."""
+    import os
+
+    from amnmt.inference.export import export_checkpoint
+
+    export_checkpoint(checkpoint, tmp_path / "bundle")
+    blobs, snap = tmp_path / "blobs", tmp_path / "snapshots" / "abc"
+    blobs.mkdir()
+    snap.mkdir(parents=True)
+    (tmp_path / "bundle" / "model.pt").rename(blobs / "0123hash")
+    (tmp_path / "bundle" / "tokenizer.json").rename(snap / "tokenizer.json")
+    try:
+        os.symlink(blobs / "0123hash", snap / "model.pt")
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks not permitted on this system")
+    assert default_tokenizer_path(snap / "model.pt") == (snap / "tokenizer.json").absolute()
+    tr = Translator.from_checkpoint(snap / "model.pt", device="cpu")
+    assert tr.translate([EN[0]], "en-am", beam_size=1)
+
+
 def test_hf_prefix_resolves_via_hub_download(
     checkpoint: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

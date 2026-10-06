@@ -24,7 +24,9 @@ _LANGS: dict[str, tuple[str, str]] = {"en-am": ("en", "am"), "am-en": ("am", "en
 def default_tokenizer_path(checkpoint: Path) -> Path:
     """Exported bundle: tokenizer.json beside model.pt.
     Trainer run: <artifacts>/runs/<run>/<ckpt>.pt -> <artifacts>/tokenizer/tokenizer.json"""
-    checkpoint = checkpoint.resolve()
+    # absolute() not resolve(): in the HF cache model.pt is a symlink into blobs/, and the
+    # tokenizer sits beside the *link*, not beside the blob.
+    checkpoint = checkpoint.absolute()
     beside = checkpoint.parent / "tokenizer.json"
     if beside.exists():
         return beside
