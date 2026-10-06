@@ -156,10 +156,9 @@ for col, ex in zip(ex_cols, EXAMPLES[ss.direction], strict=True):
 b1, b2 = st.columns([1, 3])
 with b1:
     go = st.button("Translate", type="primary", use_container_width=True)
-with b2:
-    with st.popover("Options"):
-        beam = st.select_slider("Beam size", options=[1, 2, 4, 6, 8], value=4)
-        length_penalty = st.slider("Length penalty", 0.0, 2.0, 1.0, 0.1)
+with b2, st.popover("Options"):
+    beam = st.select_slider("Beam size", options=[1, 2, 4, 6, 8], value=4)
+    length_penalty = st.slider("Length penalty", 0.0, 2.0, 1.0, 0.1)
 
 if go:
     lines = [line for line in text.splitlines() if line.strip()]
