@@ -91,6 +91,9 @@ ignore = ["RUF001", "RUF002", "RUF003", "RUF012", "N812"]
 [tool.ruff.lint.isort]
 known-first-party = ["amnmt"]
 
+[tool.ruff.lint.per-file-ignores]
+"demo/app.py" = ["E501"]  # embedded CSS / HTML / markdown table strings
+
 [tool.mypy]
 python_version = "3.12"  # dev interpreter; numpy stubs use `type` statements
 packages = ["amnmt"]
