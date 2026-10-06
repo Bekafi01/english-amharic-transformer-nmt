@@ -107,9 +107,9 @@ def _use(example: str) -> None:
 # ------------------------------------------------------------------ header
 st.markdown(
     f"""
-<p class="t-title">English <span>↔</span> Amharic</p>
-<p class="t-sub">A from-scratch Transformer trained on a single Colab T4 ·
-<a href="{REPO}">code</a> · <a href="https://huggingface.co/{MODEL_ID}">weights</a></p>
+<div class="t-title">English <span>↔</span> Amharic</div>
+<div class="t-sub">A from-scratch Transformer trained on a single Colab T4 ·
+<a href="{REPO}">code</a> · <a href="https://huggingface.co/{MODEL_ID}">weights</a></div>
 """,
     unsafe_allow_html=True,
 )
