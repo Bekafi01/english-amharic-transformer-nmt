@@ -59,6 +59,8 @@ Live demo: [english-amharic-nmt.streamlit.app](https://english-amharic-nmt.strea
 may take a minute to wake) ·
 Weights: [Bekafi/amnmt-en-am-base](https://huggingface.co/Bekafi/amnmt-en-am-base) (CC-BY-NC-4.0).
 
+[![Live demo](docs/demo.png)](https://english-amharic-nmt.streamlit.app)
+
 ```bash
 pip install "amnmt[tokenization,hub] @ git+https://github.com/Bekafi01/english-amharic-transformer-nmt.git"
 amnmt translate -m hf://Bekafi/amnmt-en-am-base -d en-am "Coffee originated in Ethiopia."
