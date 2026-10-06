@@ -70,8 +70,9 @@ tr.translate(["The children are playing in the garden."], "en-am")
 ```
 
 Any `-m` / `AMNMT_CHECKPOINT` that accepts a path also accepts `hf://<repo>[@<revision>]`, so the
-REST API and Docker image can run straight from the Hub. The `demo/` folder holds the hosted demo
-app (deployed from this repo by Streamlit Community Cloud) and the model card.
+REST API and Docker image can run straight from the Hub. The hosted demo is `demo/app.py`, deployed
+from this repo by Streamlit Community Cloud via the root `streamlit_app.py` / `requirements.txt` /
+`runtime.txt` (those three files exist only for that platform).
 
 ### Reproducing the full model on Colab / Kaggle
 

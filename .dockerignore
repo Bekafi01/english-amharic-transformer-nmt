@@ -13,3 +13,7 @@ scripts
 *.pt
 *.npz
 *.parquet
+streamlit_app.py
+requirements.txt
+runtime.txt
+demo
