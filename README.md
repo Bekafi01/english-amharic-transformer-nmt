@@ -4,6 +4,8 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch 2.3+](https://img.shields.io/badge/PyTorch-2.3+-ee4c2c.svg)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Demo](https://img.shields.io/badge/demo-streamlit-FF4B4B.svg)](https://english-amharic-nmt.streamlit.app)
+[![Model](https://img.shields.io/badge/%F0%9F%A4%97%20model-Bekafi%2Famnmt--en--am--base-yellow.svg)](https://huggingface.co/Bekafi/amnmt-en-am-base)
 
 A from-scratch PyTorch Transformer for bidirectional English–Amharic translation, built as a
 layered Python package with one CLI. One 60M-parameter model handles both directions via a
@@ -70,9 +72,10 @@ tr.translate(["The children are playing in the garden."], "en-am")
 ```
 
 Any `-m` / `AMNMT_CHECKPOINT` that accepts a path also accepts `hf://<repo>[@<revision>]`, so the
-REST API and Docker image can run straight from the Hub. The hosted demo is `demo/app.py`, deployed
-from this repo by Streamlit Community Cloud via the root `streamlit_app.py` / `requirements.txt` /
-`runtime.txt` (those three files exist only for that platform).
+REST API and Docker image can run straight from the Hub. The hosted demo is `demo/app.py`; Streamlit
+Community Cloud deploys it from this repo via the root `streamlit_app.py` shim and installs
+dependencies with `uv sync` from `uv.lock` (the `demo` dependency group and the Linux CPU-torch
+index in `pyproject.toml` exist for that).
 
 ### Reproducing the full model on Colab / Kaggle
 
