@@ -1,6 +1,0 @@
-# Streamlit Community Cloud picks this up in preference to uv.lock / pyproject.toml.
-# Hosted demo only: CPU torch + the package (inference extras) from this checkout.
---extra-index-url https://download.pytorch.org/whl/cpu
-torch>=2.3
--e .[tokenization,hub]
-streamlit>=1.35

@@ -39,6 +39,22 @@ dev = [
     "import-linter>=2.0",
     "types-PyYAML",
 ]
+# Streamlit Community Cloud installs via `uv sync` from uv.lock and ignores requirements.txt, so the
+# hosted demo's needs live in a default group. Local dev gets them too; they are small.
+demo = ["tokenizers>=0.19", "huggingface_hub>=0.23", "streamlit>=1.35"]
+
+[tool.uv]
+default-groups = ["dev", "demo"]
+
+# Linux CPU wheels for torch: the hosted demo runs on CPU and the CUDA build pulls ~2 GB of
+# nvidia-* packages. Windows/macOS keep the default index (uv picks per-platform).
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [project.scripts]
 amnmt = "amnmt.cli:app"
